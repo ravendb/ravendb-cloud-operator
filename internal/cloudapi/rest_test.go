@@ -71,6 +71,24 @@ func TestGetAccountInfoSendsAPIKeyHeader(t *testing.T) {
 	}
 }
 
+// A redirect would carry X-Api-Key, which acts as the account owner, to
+// wherever it points.
+func TestARedirectIsNotFollowed(t *testing.T) {
+	var elsewhere atomic.Int32
+	other := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { elsewhere.Add(1) }))
+	t.Cleanup(other.Close)
+	client, _ := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, other.URL+r.URL.Path, http.StatusFound)
+	}))
+
+	if _, err := client.GetAccountInfo(context.Background()); err == nil {
+		t.Error("a redirect was taken for an answer")
+	}
+	if n := elsewhere.Load(); n != 0 {
+		t.Errorf("the redirect target got %d request(s), and with them the API key", n)
+	}
+}
+
 func TestGetClusterMapsProviderAndStatus(t *testing.T) {
 	client, _ := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v1/products/details/abc" {

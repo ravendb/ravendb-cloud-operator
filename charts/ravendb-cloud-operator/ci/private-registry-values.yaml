@@ -15,8 +15,6 @@ image:
   tag: 0.1.0
   pullPolicy: Always
 
-cloudEndpoint: http://mockcloud.ravendb-cloud-lab.svc.cluster.local
-
 extraEnv:
   # A plain value, which is the case a numeric-looking string gets wrong under
   # --set and right in a file like this one.

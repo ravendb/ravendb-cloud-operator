@@ -51,16 +51,9 @@ spec:
             - --zap-devel=true
             {{- end }}
             - --zap-log-level={{ .Values.logging.level }}
-          {{- if or .Values.cloudEndpoint .Values.extraEnv }}
+          {{- with .Values.extraEnv }}
           env:
-            {{- with .Values.cloudEndpoint }}
-            # Development only.
-            - name: RAVENDB_CLOUD_ENDPOINT
-              value: {{ . | quote }}
-            {{- end }}
-            {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
-            {{- end }}
           {{- end }}
           securityContext:
             allowPrivilegeEscalation: false

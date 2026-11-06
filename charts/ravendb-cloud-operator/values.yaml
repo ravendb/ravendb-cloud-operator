@@ -70,9 +70,6 @@ affinity: {}
 podAnnotations: {}
 podLabels: {}
 
-# Development only. Leave empty.
-cloudEndpoint: ""
-
 # Extra environment variables for the manager, in the Kubernetes list form, so
 # valueFrom works as well as a plain value. Passed through as written, which is
 # what keeps valueFrom available and means a numeric-looking value needs

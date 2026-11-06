@@ -129,6 +129,11 @@ func run() error {
 	// process shares, and one each would multiply it.
 	clients := cloudclients.NewCache(mgr.GetClient(), userAgent)
 	clients.Endpoint = os.Getenv(cloudapi.EndpointEnvVar)
+	if clients.Endpoint != "" {
+		// Every API key in the cluster goes there, so it is said once at start.
+		setupLog.Info("calling a RavenDB Cloud API other than the default", "endpoint", clients.Endpoint,
+			"from", cloudapi.EndpointEnvVar)
+	}
 	clients.Pacing.RateLimit = rateLimitFrom(os.Getenv(rateLimitEnvVar))
 
 	if err := addControllers(mgr, clients); err != nil {

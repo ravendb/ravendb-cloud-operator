@@ -52,7 +52,16 @@ const attemptTimeout = 30 * time.Second
 // sharedHTTPClient is behind every REST client. The API key travels in a
 // header, never in transport state, so one connection pool serves every
 // CloudAccount.
-var sharedHTTPClient = &http.Client{Timeout: attemptTimeout}
+//
+// It follows no redirect: Go copies X-Api-Key to wherever a redirect points,
+// and the key acts as the account owner. RavenDB Cloud's API sends none, so a
+// 3xx is reported as the error it is.
+var sharedHTTPClient = &http.Client{
+	Timeout: attemptTimeout,
+	CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
+}
 
 // Options configures a REST client.
 type Options struct {

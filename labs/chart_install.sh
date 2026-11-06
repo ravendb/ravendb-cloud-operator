@@ -57,9 +57,10 @@ helm install "$RELEASE" "$CHART" \
   --set image.tag="${IMAGE_TAG##*:}" \
   --set image.pullPolicy=IfNotPresent \
   --set watchNamespace="$LAB_NAMESPACE" \
-  --set cloudEndpoint="http://mockcloud.$LAB_CLOUD_NAMESPACE.svc.cluster.local" \
   --set extraEnv[0].name=RAVENDB_CLOUD_RATE_LIMIT_PER_SECOND \
   --set-string extraEnv[0].value="${LAB_RATE_LIMIT:-50}" \
+  --set extraEnv[1].name=RAVENDB_CLOUD_ENDPOINT \
+  --set-string extraEnv[1].value="http://mockcloud.$LAB_CLOUD_NAMESPACE.svc.cluster.local" \
   --wait --timeout 120s >/dev/null
 info "release $RELEASE in $RELEASE_NS, watching $LAB_NAMESPACE"
 

@@ -15,6 +15,11 @@ Wire types live in `wire.go` and stay separate from domain types; every
 wire-to-domain fixup (provider spelling, URL scheme) happens once, in
 `toDomain()`.
 
+The API key acts as the account owner, so it goes to one place. The shared HTTP
+client follows no redirect, because Go would copy `X-Api-Key` to wherever one
+points, and a 3xx is an error like any other non-2xx. No resource field or chart
+value chooses where the key goes.
+
 ## Pacing and deadlines
 
 The operator paces its calls. Every client in the process shares one pace, held
