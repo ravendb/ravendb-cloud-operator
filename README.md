@@ -84,7 +84,8 @@ Then the key, the account and a cluster:
 ```bash
 kubectl create namespace apps
 read -rsp 'RavenDB Cloud API key: ' key && echo
-kubectl -n apps create secret generic ravendb-cloud-api-key --from-literal=apiKey="$key"
+printf 'apiVersion: v1\nkind: Secret\nmetadata: {name: ravendb-cloud-api-key, namespace: apps}\nstringData: {apiKey: "%s"}\n' "$key" |
+  kubectl create -f -
 unset key
 kubectl apply -f examples/00-account.yaml    # set allowedIPs to your addresses first
 kubectl apply -f examples/01-provision-minimal.yaml

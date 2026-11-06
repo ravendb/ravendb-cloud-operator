@@ -7,10 +7,13 @@
 # The key itself is not in this file, so it never lands in git. Create it in
 # the RavenDB Cloud portal under Account -> API Keys, then put it in a Secret,
 # typed at a prompt rather than on the command line, so it stays out of shell
-# history too:
+# history and process listings too. printf is a shell builtin, so the key
+# reaches kubectl on stdin; kubectl create, not apply, so no copy of it lands in
+# an annotation:
 #
 #   read -rsp 'RavenDB Cloud API key: ' key && echo
-#   kubectl -n apps create secret generic ravendb-cloud-api-key --from-literal=apiKey="$key"
+#   printf 'apiVersion: v1\nkind: Secret\nmetadata: {name: ravendb-cloud-api-key, namespace: apps}\nstringData: {apiKey: "%s"}\n' "$key" |
+#     kubectl create -f -
 #   unset key
 ---
 apiVersion: cloud.ravendb.net/v1alpha1

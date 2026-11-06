@@ -21,11 +21,13 @@ Three kinds, all namespaced:
 ## The smallest working setup
 
 The API key goes into a Secret created from a prompt, never into a manifest
-file that could reach git:
+file that could reach git, and never onto a command line, where `ps` shows it.
+`printf` is a shell builtin, so the key reaches kubectl on stdin:
 
 ```bash
 read -rsp 'RavenDB Cloud API key: ' key && echo
-kubectl create secret generic ravendb-cloud-api-key --from-literal=apiKey="$key"
+printf 'apiVersion: v1\nkind: Secret\nmetadata: {name: ravendb-cloud-api-key}\nstringData: {apiKey: "%s"}\n' "$key" |
+  kubectl create -f -
 unset key
 ```
 
