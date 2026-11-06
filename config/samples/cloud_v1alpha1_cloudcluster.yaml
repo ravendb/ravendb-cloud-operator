@@ -35,6 +35,10 @@ spec:
       - 10.0.0.0/8
       - 203.0.113.7/32
 
+  # CreateOnly: a new cluster. A written managementPolicy Full, or
+  # deletionPolicy Terminate, needs CreateOnly or TakeOverOnly.
+  creationMode: CreateOnly
+
   # Full: the operator may create the cluster and change instance type, storage
   # and node count to match this manifest. Unset, it is Full for a cluster this
   # object creates and Observe for one it finds already running.

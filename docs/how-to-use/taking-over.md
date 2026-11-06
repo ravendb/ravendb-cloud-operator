@@ -65,9 +65,10 @@ That is safer than it looks:
 Under the default `creationMode`, `TakeOverOrCreate`, an object that finds a
 cluster nobody told it about takes it over and records a Warning event. If
 that cluster is the one you meant, set `creationMode: TakeOverOnly` to say so.
-If it is not, delete the object, which leaves the cluster as it is, unless
-`deletionPolicy` is `Terminate`: then set `Retain` first, because deleting an
-object terminates whatever cluster it holds, taken over or created.
+If it is not, delete the object, which leaves the cluster as it is.
+`deletionPolicy: Terminate` and a written `managementPolicy: Full` are refused
+under `TakeOverOrCreate`, so an object that took the wrong cluster over can
+neither reshape nor terminate it.
 
 ## Using a cluster managed somewhere else
 
@@ -80,7 +81,8 @@ never change it, creating included, and that still gives three things:
   added or RavenDB Cloud renews the certificate.
 - **A look before handing over control.** CHANGES reports how a manifest
   differs from the running cluster without applying anything. When the
-  difference is the one you mean, `managementPolicy: Full` applies it.
+  difference is the one you mean, `managementPolicy: Full` with
+  `creationMode: TakeOverOnly` applies it.
 - **Status where the rest of the platform looks.** `kubectl get`, events and
   alerts on `Ready`, including `DeletedInCloud` when somebody removes the
   cluster in the portal.

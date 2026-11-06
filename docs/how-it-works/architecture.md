@@ -114,14 +114,16 @@ from RavenDB Cloud.
 **Defaults are the safe answer, not the convenient one.**
 `deletionPolicy` defaults to `Retain`, so `kubectl delete cloudcluster` drops the
 Kubernetes object and leaves the database running. Destroying a paid production
-cluster requires writing `deletionPolicy: Terminate` on purpose; then it ends
-the cluster the object holds, created or taken over, whatever
-`managementPolicy` says. It cannot depend on which of the two happened, because
-only status records that and a restore loses status. A found cluster defaults to
-`managementPolicy: Observe`, because finding a cluster you did not create should
-not hand a controller permission to resize it on the next reconcile, and a
-take-over the manifest did not ask for records a Warning saying how to let go of
-the cluster without ending it.
+cluster requires writing `deletionPolicy: Terminate` on purpose, together with
+`creationMode` `CreateOnly` or `TakeOverOnly`; then it ends the cluster the
+object holds, created or taken over, whatever `managementPolicy` says. It
+cannot depend on which of the two happened, because only status records that
+and a restore loses status, so the manifest has to say it. A found cluster
+defaults to `managementPolicy: Observe`, because finding a cluster you did not
+create should not hand a controller permission to resize it on the next
+reconcile, and a written `Full` has the same `creationMode` rule as
+`Terminate`. A take-over the manifest did not ask for records a Warning saying
+how to let go of the cluster.
 
 **The CRD refuses what the cloud cannot do.**
 RavenDB Cloud can change a cluster's instance type, storage and node count. It

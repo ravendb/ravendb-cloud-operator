@@ -74,6 +74,11 @@ through the API, only found: create one in the portal first.
   the object holds, created or taken over, and cannot be undone; the name is
   free again once termination completes.
 
+A written `managementPolicy: Full` and `deletionPolicy: Terminate` both need
+`creationMode` `CreateOnly` (a new cluster) or `TakeOverOnly` (one that already
+runs); `kubectl apply` refuses them under `TakeOverOrCreate`. Once a cluster
+exists, a manifest kept in git says `TakeOverOnly`.
+
 ## Rules that surprise people
 
 - Until the object has found or created its cluster, every field can be

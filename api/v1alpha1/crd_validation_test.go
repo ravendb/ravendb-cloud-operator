@@ -762,6 +762,47 @@ func TestCRDRefusesCreateOnlyUnderObserve(t *testing.T) {
 	}
 }
 
+// TestCRDTiesTerminateAndFullToAnExplicitCreationMode: under TakeOverOrCreate
+// a manifest cannot tell whether it will find a cluster that merely shares the
+// name, so it may not terminate or reshape what it finds. The rule reads only
+// the spec, so a restore from git keeps it.
+func TestCRDTiesTerminateAndFullToAnExplicitCreationMode(t *testing.T) {
+	requireEnvtest(t)
+	ns := newNamespace(t)
+
+	cases := []struct {
+		name    string
+		mutate  func(*v1alpha1.CloudCluster)
+		refused string
+	}{
+		{"terminate", func(c *v1alpha1.CloudCluster) { c.Spec.DeletionPolicy = v1alpha1.DeletionTerminate }, "spec.deletionPolicy"},
+		{"full", func(c *v1alpha1.CloudCluster) { c.Spec.ManagementPolicy = v1alpha1.ManagementFull }, "spec.managementPolicy"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name+"-default", func(t *testing.T) {
+			cluster := baseCluster(ns, tc.name+"-default")
+			tc.mutate(cluster)
+			err := k8sClient.Create(context.Background(), cluster)
+			if err == nil {
+				t.Fatal("the API server admitted it under the default TakeOverOrCreate")
+			}
+			if !strings.Contains(err.Error(), tc.refused) || !strings.Contains(err.Error(), "CreateOnly or TakeOverOnly") {
+				t.Errorf("message %q does not blame %s or say what to set", err.Error(), tc.refused)
+			}
+		})
+		for _, mode := range []v1alpha1.CreationMode{v1alpha1.CreationCreateOnly, v1alpha1.CreationTakeOverOnly} {
+			t.Run(tc.name+"-"+strings.ToLower(string(mode)), func(t *testing.T) {
+				cluster := baseCluster(ns, tc.name+"-"+strings.ToLower(string(mode)))
+				cluster.Spec.CreationMode = mode
+				tc.mutate(cluster)
+				if err := k8sClient.Create(context.Background(), cluster); err != nil {
+					t.Errorf("refused with creationMode %s: %v", mode, err)
+				}
+			})
+		}
+	}
+}
+
 // TestCRDEnforcesTheNodeCeiling pins the node rules. RavenDB Cloud gives a
 // Production cluster the three standard nodes A, B and C, never removes them,
 // and allows at most three additional ones; a Free or Development cluster has

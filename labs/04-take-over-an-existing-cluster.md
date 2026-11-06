@@ -42,9 +42,9 @@ sent. And it left a Warning:
 
 ```
 Warning Adopted: Found RavenDB Cloud cluster "lab04-legacy-wi5o" (7-A) already running and took
-it over; managing it with managementPolicy Observe, which changes nothing, until
-spec.managementPolicy is Full. Nothing in the manifest asked for an existing cluster: set
-spec.creationMode to TakeOverOnly to confirm this one is meant.
+it over; managing it with managementPolicy Observe, which changes nothing until you set
+spec.creationMode to TakeOverOnly and spec.managementPolicy to Full. Nothing in the manifest asked
+for an existing cluster: set spec.creationMode to TakeOverOnly to confirm this one is meant.
 ```
 
 A Warning, because this manifest would have created a cluster had the name been free. A name can
@@ -69,16 +69,19 @@ lab04-legacy-wi5o   Running   NotApplied   ...
 
 instanceType differs (desired PB20, actual PB10); managementPolicy is Observe, the default for a
 cluster this object found already running, so no changes were applied; set
-spec.managementPolicy to Full to apply them.
+spec.creationMode to TakeOverOnly and spec.managementPolicy to Full to apply them.
 ```
 
 The cluster still serves, so `STATUS` stays `Running`. Nothing was resized: that is why a found
-cluster starts under Observe. When the difference is what you want, say so:
+cluster starts under Observe. When the difference is what you want, say so, and say the cluster
+is yours: `Full` is refused under the default `TakeOverOrCreate`, which could have found a
+cluster that only shares the name.
 
 ```yaml
 spec:
   tier: Production
   instanceType: PB20
+  creationMode: TakeOverOnly
   managementPolicy: Full
 ```
 

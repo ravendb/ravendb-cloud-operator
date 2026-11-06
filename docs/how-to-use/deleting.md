@@ -11,7 +11,9 @@ the cluster in RavenDB Cloud is decided by `spec.deletionPolicy`:
 - **`Terminate`.** The operator asks RavenDB Cloud to terminate the cluster,
   and the object goes once RavenDB Cloud has accepted. This ends whatever
   cluster the object holds, whether it created it or took it over, and whatever
-  `managementPolicy` says. Terminating cannot be undone.
+  `managementPolicy` says. It needs `creationMode` `CreateOnly` or
+  `TakeOverOnly`, so a cluster that only shares the name is never terminated.
+  Terminating cannot be undone.
 
 A terminated cluster takes a few minutes to wind down. When it has, RavenDB
 Cloud hides it in the portal, which frees its name: RavenDB Cloud keeps a
@@ -22,7 +24,9 @@ the new one at a later poll.
 
 ## Retiring a cluster
 
-1. Set `deletionPolicy: Terminate` on the object and apply it.
+1. Set `deletionPolicy: Terminate` on the object and apply it. It needs
+   `creationMode` `CreateOnly` or `TakeOverOnly`; the object holds its
+   cluster already, so `TakeOverOnly` is always accepted.
 2. Delete the object. It disappears once RavenDB Cloud has accepted the
    terminate; until then STATUS reads `Deleting` with the reason.
 3. Check that it is gone. The `Terminating` event names the cluster, but events

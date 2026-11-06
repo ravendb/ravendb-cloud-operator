@@ -39,56 +39,28 @@ func TestCreateOnlyNeverTakesOver(t *testing.T) {
 	}
 }
 
-// deleteTakenOver takes over a seeded cluster under mode, with Terminate, then
-// deletes the object.
-func deleteTakenOver(t *testing.T, mode v1alpha1.CreationMode) (*harness, *cloudsim.Cluster) {
-	t.Helper()
+// Terminate ends the cluster an object holds however it came to hold it.
+// Whether the object created the cluster is known only from status, which a
+// restore from git loses, and a Terminate that worked only until then would
+// leave the cluster running and billed. Admission is what keeps Terminate to
+// a cluster the manifest claims.
+func TestTerminateEndsAClusterTakenOver(t *testing.T) {
 	h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.CreationMode = mode
+		c.Spec.CreationMode = v1alpha1.CreationTakeOverOnly
 		c.Spec.DeletionPolicy = v1alpha1.DeletionTerminate
 	}))
 	seeded := h.seedCloudCluster(cloudsim.SeedSpec{DisplayName: "orders"})
 	h.reconcileClusterUntilSettled("orders", 6)
-	h.events()
 	if err := h.k8s.Delete(context.Background(), h.getCluster("orders")); err != nil {
 		t.Fatalf("deleting: %v", err)
 	}
 	h.reconcileCluster("orders")
-	return h, seeded
-}
 
-// Terminate ends the cluster an object holds however it came to hold it. It
-// used to leave one found under TakeOverOrCreate running, and since only
-// status says how a cluster was found, a cluster this object created and then
-// found again after a restore from git was left running and billed.
-func TestTerminateEndsAClusterTakenOverInEitherMode(t *testing.T) {
-	for _, mode := range []v1alpha1.CreationMode{v1alpha1.CreationTakeOverOrCreate, v1alpha1.CreationTakeOverOnly} {
-		t.Run(string(mode), func(t *testing.T) {
-			h, seeded := deleteTakenOver(t, mode)
-
-			if n := h.cloud.CallCount("TerminateCluster"); n != 1 {
-				t.Errorf("TerminateCluster called %d times, want once", n)
-			}
-			if got, _ := h.cloudCluster(seeded.ID); got.Status == "Active" {
-				t.Error("the cluster is still Active")
-			}
-		})
+	if n := h.cloud.CallCount("TerminateCluster"); n != 1 {
+		t.Errorf("TerminateCluster called %d times, want once", n)
 	}
-}
-
-// The usual way out of a takeover nobody meant is deleting the object, and
-// under Terminate that ends the cluster, so the warning says to switch to
-// Retain first.
-func TestAnUnaskedTakeoverUnderTerminateWarnsBeforeTheDelete(t *testing.T) {
-	h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.DeletionPolicy = v1alpha1.DeletionTerminate
-	}))
-	h.seedCloudCluster(cloudsim.SeedSpec{DisplayName: "orders"})
-	h.reconcileCluster("orders")
-
-	events := strings.Join(h.events(), "\n")
-	if !strings.Contains(events, "set spec.deletionPolicy to Retain before deleting this object") {
-		t.Errorf("the takeover warning does not say deleting would terminate; events:\n%s", events)
+	if got, _ := h.cloudCluster(seeded.ID); got.Status == "Active" {
+		t.Error("the cluster is still Active")
 	}
 }
 

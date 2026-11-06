@@ -143,8 +143,8 @@ func (r *CloudClusterRestartReconciler) waiting(
 // mayNotMutateMessage says that the cluster's policy holds the restart back.
 func mayNotMutateMessage(cluster *v1alpha1.CloudCluster) string {
 	return fmt.Sprintf(
-		"CloudCluster %q has managementPolicy %s, so the operator may not change it. Set spec.managementPolicy to Full and this runs.",
-		cluster.Name, cluster.EffectiveManagementPolicy())
+		"CloudCluster %q has managementPolicy %s, so the operator may not change it. To let this run, %s.",
+		cluster.Name, cluster.EffectiveManagementPolicy(), howToAllowChanges(cluster))
 }
 
 // issue sends the restart, once.

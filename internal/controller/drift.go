@@ -102,9 +102,19 @@ func (r *CloudClusterReconciler) applyFirst(
 func whyNotApplied(cluster *v1alpha1.CloudCluster) string {
 	if cluster.Spec.ManagementPolicy == "" {
 		return "managementPolicy is Observe, the default for a cluster this object " +
-			"found already running, so no changes were applied; set spec.managementPolicy to Full to apply them"
+			"found already running, so no changes were applied; " + howToAllowChanges(cluster) + " to apply them"
 	}
 	return fmt.Sprintf("managementPolicy is %s, so no changes were applied", cluster.EffectiveManagementPolicy())
+}
+
+// howToAllowChanges says what to write for the operator to change a cluster it
+// holds under Observe. Admission refuses Full under TakeOverOrCreate, so there
+// the manifest has to confirm the cluster as well.
+func howToAllowChanges(cluster *v1alpha1.CloudCluster) string {
+	if cluster.EffectiveCreationMode() == v1alpha1.CreationTakeOverOrCreate {
+		return "set spec.creationMode to TakeOverOnly and spec.managementPolicy to Full"
+	}
+	return "set spec.managementPolicy to Full"
 }
 
 // shapeDifference is one divergence between the desired shape and the live

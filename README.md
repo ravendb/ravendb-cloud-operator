@@ -51,8 +51,9 @@ The cluster's URLs and client certificate are in the Secret `orders-dev-connecti
 | `CloudClusterRestart` | restarts one node, once |
 
 - **The display name finds the cluster.** If one exists, the object takes it
-  over and only observes it until `managementPolicy` is `Full`. If none does,
-  the operator creates it. `creationMode` can allow only one of the two.
+  over and only observes it until the manifest confirms it with
+  `creationMode: TakeOverOnly` and `managementPolicy: Full`. If none does, the
+  operator creates it. `creationMode` can allow only one of the two.
 - **Only what the manifest sets is managed.** A field left out stays as the
   cluster has it.
 - **`kubectl delete` keeps the cluster** unless the manifest says

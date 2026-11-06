@@ -43,7 +43,7 @@ accepted; [architecture.md](architecture.md) says why.
 
 | Mode | Finds a cluster | Finds nothing |
 |---|---|---|
-| `TakeOverOrCreate` (default) | takes it over, with a Warning `Adopted` event saying how to confirm it, and under `Terminate` how to let go without ending it | creates one |
+| `TakeOverOrCreate` (default) | takes it over, with a Warning `Adopted` event saying how to confirm it | creates one |
 | `TakeOverOnly` | takes it over, Normal `Adopted` | `ClusterNotFound`, creates nothing |
 | `CreateOnly` | `NameTaken`, binds nothing | creates one |
 
@@ -57,6 +57,13 @@ meant to be its own. That is also the way out for a `CreateOnly` object
 restored without its status, which finds the cluster it once created and
 refuses it. CEL also refuses `CreateOnly` with `managementPolicy: Observe`,
 which could never do anything.
+
+CEL ties `deletionPolicy: Terminate` and a written `managementPolicy: Full` to
+`CreateOnly` or `TakeOverOnly`. Under `TakeOverOrCreate` a manifest cannot know
+whether its name will find a cluster that merely shares it, and terminating or
+reshaping are the two ways to hurt such a cluster. The rule reads only the
+spec, so a restore from git keeps it, where a check on `status.adopted` would
+be lost with the status.
 
 `managementPolicy` defaults per outcome: a cluster the object created runs under
 `Full`, one it took over under `Observe` (reports differences, applies none)
@@ -93,3 +100,5 @@ operator, with the key from the CloudAccount's Secret, or from
   every path that binds, the interrupted-create path included.
 - Don't make `TakeOverOrCreate` stop warning when it takes a cluster over: the
   Warning is how an accidental match gets noticed.
+- Don't move the `Terminate` and `Full` rules from CEL to status: a restore
+  loses status, and the cluster it finds then looks taken over.

@@ -144,29 +144,21 @@ func (r *CloudClusterReconciler) takeOver(
 	// A Warning, because nothing in the manifest asked for this: the same
 	// manifest would have created a cluster had the name been free, and this
 	// object now publishes the found cluster's certificate.
+	// Admission keeps Terminate away from TakeOverOrCreate, so deleting this
+	// object always leaves the cluster running.
 	emit(r.Recorder, cluster, corev1.EventTypeWarning, v1alpha1.EventAdopted,
 		"Found RavenDB Cloud cluster %q (%s) already running and took it over; %s. Nothing in the manifest asked "+
-			"for an existing cluster: set spec.creationMode to TakeOverOnly to confirm this one is meant. %s",
-		ref.Name, ref.ID, howManaged(cluster), notMeantWayOut(cluster))
+			"for an existing cluster: set spec.creationMode to TakeOverOnly to confirm this one is meant. If it is "+
+			"not, delete this object, which leaves the cluster as it is, and apply it again with another displayName.",
+		ref.Name, ref.ID, howManaged(cluster))
 	return ref.ID, ctrl.Result{}, nil
-}
-
-// notMeantWayOut says how to let go of a cluster taken over by mistake. Under
-// Terminate the plain way out, deleting the object, would end the cluster.
-func notMeantWayOut(cluster *v1alpha1.CloudCluster) string {
-	if cluster.EffectiveDeletionPolicy() == v1alpha1.DeletionTerminate {
-		return "If it is not, set spec.deletionPolicy to Retain before deleting this object: deletionPolicy is " +
-			"Terminate, so deleting it now terminates that cluster."
-	}
-	return "If it is not, delete this object, which leaves the cluster as it is, and apply it again with another " +
-		"displayName."
 }
 
 // howManaged says what a found cluster is managed with, and how to change it
 // when that is the Observe default.
 func howManaged(cluster *v1alpha1.CloudCluster) string {
 	if cluster.Spec.ManagementPolicy == "" {
-		return "managing it with managementPolicy Observe, which changes nothing, until spec.managementPolicy is Full"
+		return "managing it with managementPolicy Observe, which changes nothing until you " + howToAllowChanges(cluster)
 	}
 	return fmt.Sprintf("managing it with managementPolicy %s", cluster.EffectiveManagementPolicy())
 }
@@ -233,7 +225,7 @@ func (r *CloudClusterReconciler) createUnlessForbidden(
 	case cluster.Spec.ManagementPolicy == v1alpha1.ManagementObserve:
 		r.ready(ctx, cluster, v1alpha1.ReasonClusterNotFound, fmt.Sprintf(
 			"No RavenDB Cloud cluster named %q in this account, and managementPolicy Observe never creates one. "+
-				"Set spec.managementPolicy to Full to create it. If the name is wrong, correct spec.displayName; "+
+				"Remove spec.managementPolicy to create it. If the name is wrong, correct spec.displayName; "+
 				"nothing was created.", name))
 		return "", poll, nil
 	case cluster.Spec.Tier == v1alpha1.TierFree:

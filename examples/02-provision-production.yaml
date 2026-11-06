@@ -45,19 +45,24 @@ spec:
       - 10.0.0.0/8
       - 203.0.113.7/32
 
+  # CreateOnly: this manifest makes a new cluster, and one that already has the
+  # name is reported as NameTaken and left alone. Once the cluster exists,
+  # change it to TakeOverOnly in git, so that applying the manifest after a
+  # restore finds this cluster rather than reporting its name taken.
+  creationMode: CreateOnly
+
   # Full lets the operator create the cluster and change instance type,
-  # storage and node count to match this manifest. Left unset, it is Full for a
-  # cluster this object creates and Observe for one it finds already running,
-  # which is what a restored object finds its own cluster to be. So a manifest
-  # kept in git should write Full down. The flip side: if a cluster named
-  # orders-prod already exists, it is taken over and reshaped to this manifest
-  # on the first pass.
+  # storage and node count to match this manifest. Written down, it needs
+  # creationMode CreateOnly or TakeOverOnly, so it never reshapes a cluster
+  # that merely shares the name. Left unset, it is Full for a cluster this
+  # object creates and Observe for one it finds already running.
   managementPolicy: Full
 
   # Retain is the default, and it means deleting this object leaves the cluster
   # running. Terminate ends the cluster when the object is deleted, whether the
-  # object created it or took it over, and whatever managementPolicy says. Set
-  # it only where losing the data is acceptable.
+  # object created it or took it over, and whatever managementPolicy says. Like
+  # Full, it needs creationMode CreateOnly or TakeOverOnly. Set it only where
+  # losing the data is acceptable.
   deletionPolicy: Retain
 
   connectionSecret:

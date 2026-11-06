@@ -191,6 +191,7 @@ spec:
       - 10.0.0.0/8
       - 203.0.113.7/32
 
+  creationMode: CreateOnly
   managementPolicy: Full
   deletionPolicy: Retain
   connectionSecret:

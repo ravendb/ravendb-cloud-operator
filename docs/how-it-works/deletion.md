@@ -24,9 +24,11 @@ It does not matter how the object came to hold the cluster because only status
 records that, and a restore from git or a backup loses status. A Terminate that
 worked only on a cluster the object remembered creating would leave it running
 and billed after a restore. What guards against ending a cluster nobody meant to
-hold is the take-over itself: a found cluster must match the manifest, and one
-taken over under the default `TakeOverOrCreate` records a Warning saying to set
-`Retain` before deleting the object if the cluster is not meant to be its own.
+hold is the manifest: CEL accepts `Terminate` only with `creationMode`
+`CreateOnly` or `TakeOverOnly`, so the manifest says whether the cluster is new
+or one that already runs, and a found cluster must still match it. Under the
+default `TakeOverOrCreate` deleting the object always leaves the cluster
+running.
 
 The terminate asks RavenDB Cloud to hide the product in the portal. RavenDB
 Cloud does that once termination completes, which frees the display name, so a

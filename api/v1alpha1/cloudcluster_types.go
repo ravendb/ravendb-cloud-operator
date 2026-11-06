@@ -167,6 +167,8 @@ type ConnectionSecretSpec struct {
 // +kubebuilder:validation:XValidation:rule="!has(self.nodes) || self.tier == 'Production' || self.nodes == 1",message="a Free or Development cluster has exactly one node: additional nodes are a Production feature in RavenDB Cloud. Leave spec.nodes unset or set it to 1",fieldPath=".nodes"
 // +kubebuilder:validation:XValidation:rule="!has(self.nodes) || self.tier != 'Production' || self.nodes >= 3",message="a Production cluster keeps its three standard nodes A, B and C, which RavenDB Cloud never removes. Set spec.nodes between 3 and 6",fieldPath=".nodes"
 // +kubebuilder:validation:XValidation:rule="!has(self.creationMode) || self.creationMode != 'CreateOnly' || !has(self.managementPolicy) || self.managementPolicy != 'Observe'",message="creationMode CreateOnly needs managementPolicy Full: Observe never creates a cluster",fieldPath=".creationMode"
+// +kubebuilder:validation:XValidation:rule="!has(self.deletionPolicy) || self.deletionPolicy != 'Terminate' || (has(self.creationMode) && self.creationMode != 'TakeOverOrCreate')",message="deletionPolicy Terminate needs creationMode CreateOnly or TakeOverOnly: under TakeOverOrCreate this object may take over a cluster that already has the name, and deleting the object would terminate it",fieldPath=".deletionPolicy"
+// +kubebuilder:validation:XValidation:rule="!has(self.managementPolicy) || self.managementPolicy != 'Full' || (has(self.creationMode) && self.creationMode != 'TakeOverOrCreate')",message="managementPolicy Full needs creationMode CreateOnly or TakeOverOnly: under TakeOverOrCreate this object may take over a cluster that already has the name and reshape it. Leave managementPolicy unset to manage a cluster this object creates and only observe one it finds",fieldPath=".managementPolicy"
 type CloudClusterSpec struct {
 	// AccountRef selects the CloudAccount in this namespace whose credential
 	// and defaults this cluster uses. It cannot change once this object has
@@ -321,6 +323,10 @@ type CloudClusterSpec struct {
 	// reshapes it until you say so. The resolved value is in
 	// status.managementPolicy.
 	//
+	// Written down, Full needs creationMode CreateOnly or TakeOverOnly, so
+	// that the manifest says whether the cluster it reshapes is one it
+	// creates or one that already runs.
+	//
 	// deletionPolicy does not depend on it: Terminate ends the cluster even
 	// under Observe.
 	// +optional
@@ -330,7 +336,10 @@ type CloudClusterSpec struct {
 	// cluster by.
 	//
 	//   TakeOverOrCreate  takes over a cluster that already has the name, and
-	//                     creates one when none does. The default.
+	//                     creates one when none does. The default. It does
+	//                     not go with deletionPolicy Terminate or a written
+	//                     managementPolicy Full: those need one of the two
+	//                     below.
 	//   TakeOverOnly      never creates. With no cluster of that name the
 	//                     object reports ClusterNotFound.
 	//   CreateOnly        never takes over. A cluster that already has the
@@ -348,7 +357,9 @@ type CloudClusterSpec struct {
 	// DeletionPolicy decides what deleting this object does to the cloud
 	// cluster. Retain, the default, keeps the cluster running. Terminate
 	// terminates it, which cannot be undone, whether this object created it or
-	// took it over. A terminated cluster is hidden in the RavenDB Cloud portal
+	// took it over. Terminate needs creationMode CreateOnly or TakeOverOnly, so
+	// that a cluster that merely shares the name is never taken over and then
+	// terminated. A terminated cluster is hidden in the RavenDB Cloud portal
 	// once termination completes, which frees its name for a new one.
 	// +kubebuilder:default=Retain
 	// +optional

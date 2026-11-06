@@ -190,6 +190,7 @@ metadata:
 spec:
   accountRef:
     name: ravendb-cloud
+  creationMode: CreateOnly
   deletionPolicy: Terminate
   tier: Development
   storage:
@@ -386,7 +387,10 @@ step "Part 3: Terminate on a cluster the object found"
 ADOPT_TERMINATE_ID="$(seed_cloud_cluster "$(lab_display legacy-d)")"
 check_not_empty "seeded cluster for $ADOPT_TERMINATE" "$ADOPT_TERMINATE_ID"
 
-cat <<EOF | kubectl apply -f - >/dev/null
+# adopt_terminate_manifest [mode]: the Part 3 manifest, with creationMode mode,
+# or without one when mode is empty.
+adopt_terminate_manifest() {
+  cat <<EOF
 apiVersion: cloud.ravendb.net/v1alpha1
 kind: CloudCluster
 metadata:
@@ -400,17 +404,22 @@ spec:
   displayName: $(lab_display legacy-d)
   tier: Production
   deletionPolicy: Terminate
+${1:+  creationMode: $1}
 EOF
+}
 
+REFUSED="$(adopt_terminate_manifest | kubectl apply -f - 2>&1 || true)"
+info "without creationMode, before anything is stored:"
+printf '%s\n' "$REFUSED" | sed 's/^/      /'
+check_contains "Terminate under the default creationMode is refused at admission" \
+  "deletionPolicy Terminate needs creationMode CreateOnly or TakeOverOnly" "$REFUSED"
+check "so no object exists" gone "$(object_state cloudcluster "$ADOPT_TERMINATE")"
+
+adopt_terminate_manifest TakeOverOnly | kubectl apply -f - >/dev/null
 wait_for_status "$ADOPT_TERMINATE" Running 120 || { warn "never reached Running"; operator_logs 40; }
 ADOPT_TERMINATE_UID="$(object_uid cloudcluster "$ADOPT_TERMINATE")"
-check "status.adopted" "true" "$(jp cloudcluster "$ADOPT_TERMINATE" .status.adopted)"
-check "creationMode defaulted" TakeOverOrCreate "$(jp cloudcluster "$ADOPT_TERMINATE" .spec.creationMode)"
-ADOPTED_LINE="$(wait_for_event "$ADOPT_TERMINATE_UID" "already running and took it over" 60 || true)"
-info "the takeover warning, before anybody deletes anything:"
-printf '%s\n' "$ADOPTED_LINE" | sed 's/^/      /'
-check_contains "it warns that deleting would terminate" \
-  "set spec.deletionPolicy to Retain before deleting this object" "$ADOPTED_LINE"
+check "with TakeOverOnly it takes the cluster over: status.adopted" "true" \
+  "$(jp cloudcluster "$ADOPT_TERMINATE" .status.adopted)"
 
 k delete cloudcluster "$ADOPT_TERMINATE" --wait=false >/dev/null
 wait_object_gone cloudcluster "$ADOPT_TERMINATE" 90 || operator_logs 40
@@ -419,7 +428,7 @@ check_contains "the termination event" \
   "$(wait_for_event "$ADOPT_TERMINATE_UID" "deletionPolicy is Terminate: terminating" 60 || true)"
 check "the cluster it found is terminating" yes "$(cloud_ended "$ADOPT_TERMINATE_ID")"
 note "found or created makes no difference to Terminate: only status records which,"
-note "and a restore from git or a backup does not bring status back"
+note "and a restore from git or a backup does not bring status back, so the manifest says it"
 
 # --- Part 4: deleted behind the operator's back ------------------------------
 
@@ -443,6 +452,7 @@ spec:
     name: ravendb-cloud
   displayName: $GONE_NAME
   tier: Production
+  creationMode: TakeOverOnly
   managementPolicy: Full
   pollIntervalSeconds: 5   # lab only, so the next look is seconds away
 EOF
@@ -558,6 +568,7 @@ spec:
   accountRef:
     name: $ACCOUNT
   displayName: $(lab_display t)
+  creationMode: CreateOnly
   deletionPolicy: Terminate
   tier: Development
   storage:
@@ -604,6 +615,7 @@ metadata:
 spec:
   accountRef:
     name: $MISSING_ACCOUNT
+  creationMode: CreateOnly
   deletionPolicy: Terminate
   tier: Development
 EOF
@@ -648,6 +660,7 @@ spec:
     name: $GUEST_ACCOUNT
   displayName: $(lab_display legacy-b)
   tier: Production
+  creationMode: TakeOverOnly
   deletionPolicy: Terminate
 EOF
 wait_for_status "$NOCRED_RETAIN" Running 120 || warn "$NOCRED_RETAIN never reached Running"

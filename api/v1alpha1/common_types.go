@@ -45,8 +45,8 @@ const (
 	// ManagementObserve reads cloud state, publishes connection details and
 	// reports differences, but never changes anything in RavenDB Cloud, and
 	// never creates a cluster either. Default for a cluster the object found.
-	// deletionPolicy does not depend on it: whether Terminate ends the cluster
-	// is decided by creationMode.
+	// deletionPolicy does not depend on it: Terminate ends the cluster under
+	// Observe too.
 	ManagementObserve ManagementPolicy = "Observe"
 
 	// ManagementFull creates the cluster when none exists, and applies the

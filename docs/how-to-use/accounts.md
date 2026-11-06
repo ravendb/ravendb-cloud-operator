@@ -96,4 +96,6 @@ CloudCluster holds, and the operator takes it over:
 - with `deletionPolicy: Terminate`, deleting their object terminates the
   cluster.
 
-Grant that right only to people you would give the key itself.
+The last two need `creationMode: TakeOverOnly` written down, which stops an
+accident but not someone who means it. Grant that right only to people you
+would give the key itself.

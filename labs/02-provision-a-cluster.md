@@ -133,6 +133,7 @@ spec:
     throughputMBps: 125
   networking:
     allowedIPs: [10.0.0.0/8, 203.0.113.7/32]
+  creationMode: CreateOnly       # a new cluster; a written Full needs this or TakeOverOnly
   managementPolicy: Full
   deletionPolicy: Retain
   connectionSecret:

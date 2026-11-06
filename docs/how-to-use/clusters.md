@@ -19,6 +19,7 @@ spec:
   storage: {sizeGB: 200, type: SsdPremium}
   networking:
     allowedIPs: ["10.0.0.0/8"]
+  creationMode: CreateOnly  # a new cluster; Full needs CreateOnly or TakeOverOnly
   managementPolicy: Full
 ```
 
@@ -38,6 +39,11 @@ it.
 Left unset, it is `Full` for a cluster this object created and `Observe` for
 one it found already running, so taking a cluster over never reshapes it until
 you write `Full`. `status.managementPolicy` says which applies.
+
+Written down, `Full` needs `creationMode` `CreateOnly` or `TakeOverOnly`. Under
+the default `TakeOverOrCreate` the manifest cannot say whether it will find a
+cluster that merely shares the name, so `kubectl apply` refuses it rather than
+let it reshape that cluster. `deletionPolicy: Terminate` has the same rule.
 
 ## What can change, and when
 
@@ -86,24 +92,23 @@ past three nodes. Name a larger type for a cluster that will grow.
 
 A manifest applied again after a restore, or to a rebuilt Kubernetes cluster,
 finds its cluster by name, but the object no longer knows it created that
-cluster: that was only in status. Two fields make the same file behave the same
-way both times:
+cluster: that was only in status. So once the cluster exists, write down in git
+that the manifest describes it, as `kubectl ravendb-cloud export` does:
 
-- **`managementPolicy: Full`**, written down. Otherwise the cluster comes back
-  under `Observe`, the default for a cluster found already running, and edits
-  stop being applied.
-- **`creationMode`**, chosen on purpose:
-  - `TakeOverOrCreate`, the default: creates the cluster the first time, finds
-    it again later. A takeover it did not expect raises a Warning event.
-  - `TakeOverOnly`: never creates. Use it for restores and exported
-    manifests, so a missing cluster is reported (`ClusterNotFound`) rather than
-    replaced by an empty one.
-  - `CreateOnly`: never takes over, for a cluster that must be new. After a
-    restore it reports `NameTaken` for its own cluster; change it to
-    `TakeOverOnly` to confirm the cluster is this object's.
+- **`creationMode: TakeOverOnly`**: finds the cluster and never creates one, so
+  a missing cluster is reported (`ClusterNotFound`) rather than replaced by an
+  empty one. A manifest still on `CreateOnly` reports `NameTaken` for its own
+  cluster after a restore; changing it to `TakeOverOnly` confirms the cluster
+  is this object's.
+- **`managementPolicy: Full`**, if edits should keep being applied. Otherwise
+  the cluster comes back under `Observe`, the default for a cluster found
+  already running.
 
-`deletionPolicy` behaves the same either way: `Terminate` ends whatever cluster
-the object holds, created or taken over. See [deleting.md](deleting.md).
+The default, `TakeOverOrCreate`, creates the cluster the first time and only
+observes one it finds; a takeover it did not expect raises a Warning event.
+
+`deletionPolicy: Terminate` ends whatever cluster the object holds, created or
+taken over. See [deleting.md](deleting.md).
 
 ## Leaving one cluster alone for a while
 

@@ -477,13 +477,14 @@ WAITING_MSG="$(condition_message cloudclusterrestart lab05-restart Complete)"
 check "restart STATUS under Observe"   Waiting "$(restart_status lab05-restart)"
 check "Complete condition"             False   "$(condition cloudclusterrestart lab05-restart Complete)"
 check_contains "it says what holds it back" "has managementPolicy Observe, so the operator may not change it" "$WAITING_MSG"
-check_contains "and what lets it run"       "Set spec.managementPolicy to Full and this runs" "$WAITING_MSG"
+check_contains "and what lets it run" \
+  "To let this run, set spec.creationMode to TakeOverOnly and spec.managementPolicy to Full" "$WAITING_MSG"
 check "nothing was asked of RavenDB Cloud yet" "" "$(jp cloudclusterrestart lab05-restart .status.issuedAt)"
 check_calls "restart calls while it waits" 0 "$(count_calls /api/v1/products/restart-node)"
 note "Waiting keeps the request and carries it out the moment the policy allows"
 
-info "managementPolicy Full: the restart runs without anybody touching it"
-k patch cloudcluster "$CLUSTER" --type=merge -p '{"spec":{"managementPolicy":"Full"}}' >/dev/null
+info "TakeOverOnly and managementPolicy Full: the restart runs without anybody touching it"
+k patch cloudcluster "$CLUSTER" --type=merge -p '{"spec":{"creationMode":"TakeOverOnly","managementPolicy":"Full"}}' >/dev/null
 if ! wait_for cloudclusterrestart lab05-restart "$RESTART_REASON" Succeeded "$WAIT"; then
   warn "the restart did not complete; recent operator logs:"
   operator_logs 30

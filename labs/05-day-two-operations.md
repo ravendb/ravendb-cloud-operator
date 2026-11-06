@@ -135,10 +135,10 @@ Observe` first:
 
 ```
 NAME            CLUSTER      NODE   STATUS    MESSAGE
-lab05-restart   lab05-prod   A      Waiting   CloudCluster "lab05-prod" has managementPolicy Observe, so the operator may not change it. Set spec.managementPolicy to Full and this runs.
+lab05-restart   lab05-prod   A      Waiting   CloudCluster "lab05-prod" has managementPolicy Observe, so the operator may not change it. To let this run, set spec.creationMode to TakeOverOnly and spec.managementPolicy to Full.
 ```
 
-Set the policy back to `Full` and it runs on its own, ending in `Succeeded` with a `Restarting`
+Do that and it runs on its own, ending in `Succeeded` with a `Restarting`
 and a `Restarted` event. It cannot be edited afterwards; to restart again, create another. A node
 the cluster does not have, such as `Z`, ends in `Failed` without a call, and the message lists
 the nodes there are. Create restarts with `kubectl create` and keep them out of git, since each

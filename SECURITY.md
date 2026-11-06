@@ -19,8 +19,11 @@ account, and RavenDB Cloud has no narrower one, so whoever may create a
 CloudCluster next to a CloudAccount can name any cluster in that account that
 no other CloudCluster holds: receive its client certificate, reshape it under
 `managementPolicy: Full`, and terminate it by deleting the object under
-`deletionPolicy: Terminate`. Put an account only in a namespace where everyone
-who can write CloudClusters may manage every cluster in it.
+`deletionPolicy: Terminate`. The last two need `creationMode` `CreateOnly` or
+`TakeOverOnly` written down, which keeps a manifest from doing either to a
+cluster that merely shares its name, but does not stop someone who means to.
+Put an account only in a namespace where everyone who can write CloudClusters
+may manage every cluster in it.
 
 **Write access to Secrets.** Publishing connection details is what the
 operator is for. The connection Secret holds each cluster's client

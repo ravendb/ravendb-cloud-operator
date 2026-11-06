@@ -15,7 +15,8 @@ that a database goes only when the manifest said so in writing.
 >
 > - **Retain**, the default: the cluster keeps running.
 > - **Terminate**: the cluster this object holds is terminated, whether the object created it or
->   found it. Once termination completes it is hidden in the portal, which frees its name.
+>   found it. Once termination completes it is hidden in the portal, which frees its name. It
+>   needs `creationMode` `CreateOnly` or `TakeOverOnly`.
 
 ## Do this
 
@@ -46,6 +47,7 @@ Apply the same manifest again and the new object finds that cluster by its name.
 
 ```yaml
 spec:
+  creationMode: CreateOnly       # a new cluster
   deletionPolicy: Terminate      # irreversible
 ```
 
@@ -62,21 +64,24 @@ same name, with a new id.
 
 ## A cluster the object found
 
-Terminate does not care how the object came by its cluster. The lab seeds a cluster in the
-simulator, takes it over with `deletionPolicy: Terminate`, and the takeover already warns, before
-anybody deletes anything:
+The lab seeds a cluster in the simulator and applies a manifest for it with
+`deletionPolicy: Terminate` and no `creationMode`. The API server refuses it before anything is
+stored:
 
 ```
-Warning Adopted: Found RavenDB Cloud cluster "lab06-legacy-d-t7a1" (9-A) already running and
-took it over; ... If it is not, set spec.deletionPolicy to Retain before deleting this object:
-deletionPolicy is Terminate, so deleting it now terminates that cluster.
+The CloudCluster "lab06-adopt-terminate" is invalid: spec.deletionPolicy: ... deletionPolicy
+Terminate needs creationMode CreateOnly or TakeOverOnly: under TakeOverOrCreate this object may
+take over a cluster that already has the name, and deleting the object would terminate it
 ```
 
-Delete it, and it is terminated. Why not spare found clusters? Only `status` records whether the
-object created its cluster or found it, and a restore from git or a backup does not bring status
-back. A rule that depended on it would quietly stop terminating the cluster you created, the
-first time you rebuilt the namespace. The protection against a name that matches by accident is
-the warning above, `managementPolicy: Observe` for a found cluster, and `creationMode`.
+Under the default `TakeOverOrCreate` the manifest does not say whether it means a cluster that
+already runs, so it may not end one. With `creationMode: TakeOverOnly` it says so: the object
+takes the cluster over, and deleting it terminates the cluster.
+
+From there Terminate does not care how the object came by its cluster. Only `status` records
+whether the object created it or found it, and a restore from git or a backup does not bring
+status back. A rule that depended on it would quietly stop terminating the cluster you created,
+the first time you rebuilt the namespace. So the rule reads the manifest instead.
 
 With the default `Retain`, deleting an object that found its cluster leaves the cluster exactly
 as it was.
@@ -93,9 +98,9 @@ RavenDB Cloud cluster 10-A was terminated outside this operator. Delete this obj
 new cluster, apply it again, ...
 ```
 
-The object has `managementPolicy: Full`, which may create clusters, and it still does not create
-a replacement: a second cluster would be a second bill and an empty database where the old one
-was. It reports, keeps polling, and waits for you to delete it.
+The object holds the cluster under `managementPolicy: Full`, and it does not create a
+replacement: a second cluster would be a second bill and an empty database where the old one was.
+It reports, keeps polling, and waits for you to delete it.
 
 ## Deleting an account
 

@@ -248,10 +248,12 @@ func TestAFoundClusterIsNotReshapedUntilThePolicySaysSo(t *testing.T) {
 	if cond == nil || cond.Reason != v1alpha1.ReasonNotApplied {
 		t.Fatalf("Synced = %+v, want NotApplied", cond)
 	}
-	if !contains(cond.Message, "instanceType differs") || !contains(cond.Message, "set spec.managementPolicy to Full") {
+	if !contains(cond.Message, "instanceType differs") ||
+		!contains(cond.Message, "set spec.creationMode to TakeOverOnly and spec.managementPolicy to Full") {
 		t.Errorf("message %q should name the difference and the way to apply it", cond.Message)
 	}
 
+	settled.Spec.CreationMode = v1alpha1.CreationTakeOverOnly
 	settled.Spec.ManagementPolicy = v1alpha1.ManagementFull
 	if err := h.k8s.Update(context.Background(), settled); err != nil {
 		t.Fatalf("updating spec: %v", err)
@@ -360,8 +362,10 @@ func TestObserveNeverCreatesACluster(t *testing.T) {
 	if cond == nil || cond.Reason != v1alpha1.ReasonClusterNotFound {
 		t.Fatalf("Ready = %+v, want ClusterNotFound", cond)
 	}
-	if !contains(cond.Message, "spec.managementPolicy") || !contains(cond.Message, "Full") {
-		t.Errorf("message %q does not name the field and value that would create it", cond.Message)
+	// Under TakeOverOrCreate a written Full is refused at admission, so the way
+	// to create is to leave the policy unset.
+	if !contains(cond.Message, "Remove spec.managementPolicy to create it") {
+		t.Errorf("message %q does not say what would create it", cond.Message)
 	}
 }
 

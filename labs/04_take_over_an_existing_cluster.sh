@@ -201,7 +201,7 @@ check "status.instanceType, read from the cluster" "$SMALL" "$(jp cloudcluster "
 check "Synced message" "Everything this manifest sets matches RavenDB Cloud." \
   "$(condition_message cloudcluster "$LEGACY" Synced)"
 check_contains "the Adopted event says what it found and how it manages it" \
-  "Warning Adopted: Found RavenDB Cloud cluster \"$LEGACY\" ($LEGACY_ID) already running and took it over; managing it with managementPolicy Observe, which changes nothing, until spec.managementPolicy is Full" \
+  "Warning Adopted: Found RavenDB Cloud cluster \"$LEGACY\" ($LEGACY_ID) already running and took it over; managing it with managementPolicy Observe, which changes nothing until you set spec.creationMode to TakeOverOnly and spec.managementPolicy to Full" \
   "$(events_named "$LEGACY")"
 check_contains "and, since nothing asked for an existing cluster, how to say it was meant" \
   "set spec.creationMode to TakeOverOnly to confirm this one is meant" \
@@ -269,7 +269,8 @@ check "STATUS, because the cluster serves either way" Running "$(status_of "$LEG
 check_contains "it names the difference" "instanceType differs (desired $BIG, actual $SMALL)" "$NOT_APPLIED"
 check_contains "and why it was not applied" \
   "managementPolicy is Observe, the default for a cluster this object found already running, so no changes were applied" "$NOT_APPLIED"
-check_contains "and what to do about it" "set spec.managementPolicy to Full to apply them" "$NOT_APPLIED"
+check_contains "and what to do about it" \
+  "set spec.creationMode to TakeOverOnly and spec.managementPolicy to Full to apply them" "$NOT_APPLIED"
 if on_mock; then
   # Zero means something only once the operator has demonstrably looked again.
   wait_for_next_poll "$LEGACY" "$(jp cloudcluster "$LEGACY" .status.lastSyncTime)" ||
@@ -282,7 +283,7 @@ check "the cluster is still $SMALL" "$SMALL" "$(jp cloudcluster "$LEGACY" .statu
 note "a manifest written by hand that gets a field wrong reshapes nothing: taking over"
 note "defaults to Observe exactly so that a typo is a report and not a resize"
 
-step "managementPolicy: Full, and the change goes out"
+step "TakeOverOnly and managementPolicy: Full, and the change goes out"
 k apply -f - >/dev/null <<YAML
 apiVersion: cloud.ravendb.net/v1alpha1
 kind: CloudCluster
@@ -294,6 +295,7 @@ spec:
   tier: $TIER
   instanceType: $BIG
   pollIntervalSeconds: $POLL
+  creationMode: TakeOverOnly
   managementPolicy: Full
 YAML
 
