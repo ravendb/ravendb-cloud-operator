@@ -48,11 +48,6 @@ const usage = "kubectl ravendb-cloud export --account NAME [-n NAMESPACE] (--all
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	if endpoint := os.Getenv(cloudapi.EndpointEnvVar); endpoint != "" {
-		// The account's key goes there, so it is said before anything is sent.
-		fmt.Fprintf(os.Stderr, "kubectl ravendb-cloud: calling %s, set by %s, not the default RavenDB Cloud API\n",
-			endpoint, cloudapi.EndpointEnvVar)
-	}
 	if err := run(ctx, os.Args[1:], os.Getenv, os.Stdout, connectWithKubeconfig); err != nil {
 		fmt.Fprintln(os.Stderr, "kubectl ravendb-cloud:", err)
 		os.Exit(1)
