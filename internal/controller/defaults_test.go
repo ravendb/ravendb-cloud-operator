@@ -3,7 +3,7 @@ package controller
 import (
 	"testing"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 )
 
@@ -12,10 +12,10 @@ import (
 // pick the larger, dearer shape.
 func TestTheDefaultInstanceTypeIsTheSmallestWhateverTheNames(t *testing.T) {
 	available := []cloudapi.InstanceType{
-		{Name: "a-large", Tier: cloudapi.Tier(v1alpha1.TierDevelopment), VirtualCPUs: 2, RAMGiB: 1},
-		{Name: "b-small", Tier: cloudapi.Tier(v1alpha1.TierDevelopment), VirtualCPUs: 2, RAMGiB: 0.5},
+		{Name: "a-large", Tier: cloudapi.Tier(cloudv1.TierDevelopment), VirtualCPUs: 2, RAMGiB: 1},
+		{Name: "b-small", Tier: cloudapi.Tier(cloudv1.TierDevelopment), VirtualCPUs: 2, RAMGiB: 0.5},
 	}
-	got, err := smallestForTier(available, v1alpha1.TierDevelopment)
+	got, err := smallestForTier(available, cloudv1.TierDevelopment)
 	if err != nil {
 		t.Fatal(err)
 	}

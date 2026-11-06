@@ -8,7 +8,7 @@ about the cluster is different afterwards, so no field value could mean
 "restarted", and a field would restart the node again on every resync.
 
 ```yaml
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudClusterRestart
 metadata: {generateName: orders-prod-a-, namespace: apps}
 spec:

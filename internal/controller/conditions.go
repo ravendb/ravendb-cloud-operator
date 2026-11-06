@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 )
 
 // meaning is what one condition reason stands for: the condition status it
@@ -68,65 +68,65 @@ const longWait = time.Minute
 // with its account passes through it. Deleting does not warn: a stuck deletion
 // warns on its own.
 var clusterReady = reasons{
-	v1alpha1.ReasonRunning:               isTrue,
-	v1alpha1.ReasonCreating:              isFalse.inProgress(),
-	v1alpha1.ReasonUpdating:              isFalse.inProgress(),
-	v1alpha1.ReasonWaitingForCertificate: isFalse.inProgress(),
-	v1alpha1.ReasonWaitingForAccount:     isFalse.inProgress().warnsAfter(longWait),
-	v1alpha1.ReasonDeleting:              isFalse.inProgress(),
-	v1alpha1.ReasonInvalidSpec:           isFalse.warns().stalls(),
-	v1alpha1.ReasonRefused:               isFalse.warns().stalls(),
-	v1alpha1.ReasonQuotaReached:          isFalse.warns().stalls(),
-	v1alpha1.ReasonNameTaken:             isFalse.warns().stalls(),
-	v1alpha1.ReasonClusterNotFound:       isFalse.warns().stalls(),
-	v1alpha1.ReasonDeletedInCloud:        isFalse.warns().stalls(),
-	v1alpha1.ReasonAwaitingPayment:       isFalse.warns().stalls(),
-	v1alpha1.ReasonCreationFailed:        isFalse.warns().stalls(),
-	v1alpha1.ReasonSecretNotWritten:      isFalse.warns().inProgress(),
-	v1alpha1.ReasonCloudUnreachable:      isUnknown.warns().inProgress(),
-	v1alpha1.ReasonKeyRejected:           isUnknown.warns().stalls(),
-	v1alpha1.ReasonUnexpectedResponse:    isUnknown.warns().stalls(),
+	cloudv1.ReasonRunning:               isTrue,
+	cloudv1.ReasonCreating:              isFalse.inProgress(),
+	cloudv1.ReasonUpdating:              isFalse.inProgress(),
+	cloudv1.ReasonWaitingForCertificate: isFalse.inProgress(),
+	cloudv1.ReasonWaitingForAccount:     isFalse.inProgress().warnsAfter(longWait),
+	cloudv1.ReasonDeleting:              isFalse.inProgress(),
+	cloudv1.ReasonInvalidSpec:           isFalse.warns().stalls(),
+	cloudv1.ReasonRefused:               isFalse.warns().stalls(),
+	cloudv1.ReasonQuotaReached:          isFalse.warns().stalls(),
+	cloudv1.ReasonNameTaken:             isFalse.warns().stalls(),
+	cloudv1.ReasonClusterNotFound:       isFalse.warns().stalls(),
+	cloudv1.ReasonDeletedInCloud:        isFalse.warns().stalls(),
+	cloudv1.ReasonAwaitingPayment:       isFalse.warns().stalls(),
+	cloudv1.ReasonCreationFailed:        isFalse.warns().stalls(),
+	cloudv1.ReasonSecretNotWritten:      isFalse.warns().inProgress(),
+	cloudv1.ReasonCloudUnreachable:      isUnknown.warns().inProgress(),
+	cloudv1.ReasonKeyRejected:           isUnknown.warns().stalls(),
+	cloudv1.ReasonUnexpectedResponse:    isUnknown.warns().stalls(),
 }
 
 // clusterSynced is a CloudCluster's Synced condition, the CHANGES column.
 // NotApplied is a policy the user chose or a field the API cannot change, so it
 // records nothing and is settled. Waiting is news but not a problem.
 var clusterSynced = reasons{
-	v1alpha1.ReasonApplied:    isTrue,
-	v1alpha1.ReasonApplying:   isFalse.inProgress(),
-	v1alpha1.ReasonWaiting:    isFalse.notifies().inProgress(),
-	v1alpha1.ReasonRefused:    isFalse.warns().stalls(),
-	v1alpha1.ReasonNotApplied: isFalse,
+	cloudv1.ReasonApplied:    isTrue,
+	cloudv1.ReasonApplying:   isFalse.inProgress(),
+	cloudv1.ReasonWaiting:    isFalse.notifies().inProgress(),
+	cloudv1.ReasonRefused:    isFalse.warns().stalls(),
+	cloudv1.ReasonNotApplied: isFalse,
 }
 
 // accountReady is a CloudAccount's Ready condition, its STATUS column.
 // KeyMissing warns only once it lasts: the Secret is usually applied a moment
 // after the account.
 var accountReady = reasons{
-	v1alpha1.ReasonVerified:           isTrue,
-	v1alpha1.ReasonKeyMissing:         isFalse.inProgress().warnsAfter(longWait),
-	v1alpha1.ReasonKeyRejected:        isFalse.warns().stalls(),
-	v1alpha1.ReasonCloudUnreachable:   isUnknown.warns().inProgress(),
-	v1alpha1.ReasonUnexpectedResponse: isUnknown.warns().stalls(),
-	v1alpha1.ReasonInUse:              {progress: reconciling},
+	cloudv1.ReasonVerified:           isTrue,
+	cloudv1.ReasonKeyMissing:         isFalse.inProgress().warnsAfter(longWait),
+	cloudv1.ReasonKeyRejected:        isFalse.warns().stalls(),
+	cloudv1.ReasonCloudUnreachable:   isUnknown.warns().inProgress(),
+	cloudv1.ReasonUnexpectedResponse: isUnknown.warns().stalls(),
+	cloudv1.ReasonInUse:              {progress: reconciling},
 }
 
 // restartComplete is a CloudClusterRestart's Complete condition, its STATUS
 // column. Restarting and Succeeded have events of their own. Failed also sets
 // the Failed condition; see complete.
 var restartComplete = reasons{
-	v1alpha1.ReasonWaiting:    isFalse.inProgress(),
-	v1alpha1.ReasonRestarting: isFalse.inProgress(),
-	v1alpha1.ReasonSucceeded:  isTrue,
-	v1alpha1.ReasonFailed:     isFalse.warns().stalls(),
+	cloudv1.ReasonWaiting:    isFalse.inProgress(),
+	cloudv1.ReasonRestarting: isFalse.inProgress(),
+	cloudv1.ReasonSucceeded:  isTrue,
+	cloudv1.ReasonFailed:     isFalse.warns().stalls(),
 }
 
 // The tables of each kind by condition type, which Reconciling and Stalled are
 // derived from.
 var (
-	clusterTables = map[string]reasons{v1alpha1.ConditionReady: clusterReady, v1alpha1.ConditionSynced: clusterSynced}
-	accountTables = map[string]reasons{v1alpha1.ConditionReady: accountReady}
-	restartTables = map[string]reasons{v1alpha1.ConditionComplete: restartComplete}
+	clusterTables = map[string]reasons{cloudv1.ConditionReady: clusterReady, cloudv1.ConditionSynced: clusterSynced}
+	accountTables = map[string]reasons{cloudv1.ConditionReady: accountReady}
+	restartTables = map[string]reasons{cloudv1.ConditionComplete: restartComplete}
 )
 
 // conditionWriter sets conditions on one object and says so. Every condition
@@ -235,7 +235,7 @@ func (w conditionWriter) summarize(conditions *[]metav1.Condition, generation in
 	summary := []struct {
 		condType string
 		source   *metav1.Condition
-	}{{v1alpha1.ConditionStalled, stuck}, {v1alpha1.ConditionReconciling, working}}
+	}{{cloudv1.ConditionStalled, stuck}, {cloudv1.ConditionReconciling, working}}
 	for _, s := range summary {
 		if s.source == nil {
 			meta.RemoveStatusCondition(conditions, s.condType)
@@ -252,33 +252,33 @@ func (w conditionWriter) summarize(conditions *[]metav1.Condition, generation in
 }
 
 // ready sets a CloudCluster's Ready condition.
-func (r *CloudClusterReconciler) ready(ctx context.Context, cluster *v1alpha1.CloudCluster, reason, message string) {
+func (r *CloudClusterReconciler) ready(ctx context.Context, cluster *cloudv1.CloudCluster, reason, message string) {
 	conditionWriter{r.Recorder, cluster, clusterTables, &r.warned}.set(ctx, &cluster.Status.Conditions,
-		cluster.Generation, v1alpha1.ConditionReady, reason, message)
+		cluster.Generation, cloudv1.ConditionReady, reason, message)
 }
 
 // synced sets a CloudCluster's Synced condition.
-func (r *CloudClusterReconciler) synced(ctx context.Context, cluster *v1alpha1.CloudCluster, reason, message string) {
+func (r *CloudClusterReconciler) synced(ctx context.Context, cluster *cloudv1.CloudCluster, reason, message string) {
 	conditionWriter{r.Recorder, cluster, clusterTables, &r.warned}.set(ctx, &cluster.Status.Conditions,
-		cluster.Generation, v1alpha1.ConditionSynced, reason, message)
+		cluster.Generation, cloudv1.ConditionSynced, reason, message)
 }
 
 // ready sets a CloudAccount's Ready condition.
-func (r *CloudAccountReconciler) ready(ctx context.Context, account *v1alpha1.CloudAccount, reason, message string) {
+func (r *CloudAccountReconciler) ready(ctx context.Context, account *cloudv1.CloudAccount, reason, message string) {
 	conditionWriter{r.Recorder, account, accountTables, &r.warned}.set(ctx, &account.Status.Conditions,
-		account.Generation, v1alpha1.ConditionReady, reason, message)
+		account.Generation, cloudv1.ConditionReady, reason, message)
 }
 
 // complete sets a CloudClusterRestart's Complete condition, and Failed with
 // it when the restart failed, as a Job does.
 func (r *CloudClusterRestartReconciler) complete(
-	ctx context.Context, restart *v1alpha1.CloudClusterRestart, reason, message string,
+	ctx context.Context, restart *cloudv1.CloudClusterRestart, reason, message string,
 ) {
 	conditionWriter{r.Recorder, restart, restartTables, &r.warned}.set(ctx, &restart.Status.Conditions,
-		restart.Generation, v1alpha1.ConditionComplete, reason, message)
-	if reason == v1alpha1.ReasonFailed {
+		restart.Generation, cloudv1.ConditionComplete, reason, message)
+	if reason == cloudv1.ReasonFailed {
 		meta.SetStatusCondition(&restart.Status.Conditions, metav1.Condition{
-			Type:               v1alpha1.ConditionFailed,
+			Type:               cloudv1.ConditionFailed,
 			Status:             metav1.ConditionTrue,
 			Reason:             reason,
 			Message:            message,

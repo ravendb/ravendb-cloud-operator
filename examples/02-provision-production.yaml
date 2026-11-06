@@ -3,7 +3,7 @@
 # Everything below tier can also be omitted and inherited from the CloudAccount
 # or resolved by the operator. It is written in full to show what the operator
 # can drive, and a field written here is a field it manages from now on.
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: orders-prod

@@ -15,8 +15,8 @@ resources:
   domain: ravendb.net
   group: cloud
   kind: CloudAccount
-  path: github.com/ravendb/ravendb-cloud-operator/api/v1alpha1
-  version: v1alpha1
+  path: github.com/ravendb/ravendb-cloud-operator/api/v1
+  version: v1
 - api:
     crdVersion: v1
     namespaced: true
@@ -24,8 +24,8 @@ resources:
   domain: ravendb.net
   group: cloud
   kind: CloudCluster
-  path: github.com/ravendb/ravendb-cloud-operator/api/v1alpha1
-  version: v1alpha1
+  path: github.com/ravendb/ravendb-cloud-operator/api/v1
+  version: v1
 - api:
     crdVersion: v1
     namespaced: true
@@ -33,6 +33,6 @@ resources:
   domain: ravendb.net
   group: cloud
   kind: CloudClusterRestart
-  path: github.com/ravendb/ravendb-cloud-operator/api/v1alpha1
-  version: v1alpha1
+  path: github.com/ravendb/ravendb-cloud-operator/api/v1
+  version: v1
 version: "3"

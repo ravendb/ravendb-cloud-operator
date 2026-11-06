@@ -140,7 +140,7 @@ else
   info "creating $LEGACY, then letting go of it, to stand in for a cluster"
   info "somebody created in the portal months ago"
   k apply -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $SEED
@@ -178,7 +178,7 @@ step "Taking it over with a name and a tier"
 on_mock && lab_api POST /_lab/requests/reset >/dev/null
 
 k apply -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $LEGACY
@@ -248,7 +248,7 @@ check "Secret owner is the CloudCluster" "$LEGACY" "$(jp secret "$SECRET" '.meta
 step "A hand-written manifest that says $BIG where the cluster runs $SMALL"
 on_mock && lab_api POST /_lab/requests/reset >/dev/null
 k apply -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $LEGACY
@@ -285,7 +285,7 @@ note "defaults to Observe exactly so that a typo is a report and not a resize"
 
 step "TakeOverOnly and managementPolicy: Full, and the change goes out"
 k apply -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $LEGACY
@@ -318,7 +318,7 @@ check "status.adopted is still true: Full is a choice, not a claim of authorship
 
 step "A second object for the same cluster"
 k apply -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $SECOND
@@ -359,7 +359,7 @@ note "is what a rebuilt Kubernetes cluster does: apply manifests for clusters th
 step "A manifest that gets the tier wrong"
 on_mock && lab_api POST /_lab/requests/reset >/dev/null
 k apply -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $WRONG_TIER
@@ -455,7 +455,7 @@ step "Observe, for a name nothing carries"
 BEFORE_MISSING="$(cluster_count)"
 on_mock && lab_api POST /_lab/requests/reset >/dev/null
 k apply -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $NOT_THERE
@@ -492,7 +492,7 @@ check "clusters named $TWINS" 2 "$(count_named "$TWINS")"
 info "seeded $TWIN_A and $TWIN_B, both called $TWINS"
 
 k apply -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $AMBIGUOUS

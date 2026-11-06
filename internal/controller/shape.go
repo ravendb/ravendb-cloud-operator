@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 )
 
@@ -16,7 +16,7 @@ import (
 
 // validateRegion checks a region against the list the account mirrored. field
 // names where the value came from, so the message says what to change.
-func validateRegion(account *v1alpha1.CloudAccount, provider v1alpha1.Provider, region, field string) error {
+func validateRegion(account *cloudv1.CloudAccount, provider cloudv1.Provider, region, field string) error {
 	regions := regionsFor(account, provider)
 	if len(regions) == 0 || slices.Contains(regions, region) {
 		return nil
@@ -27,7 +27,7 @@ func validateRegion(account *v1alpha1.CloudAccount, provider v1alpha1.Provider, 
 
 // regionsFor is the region list the account mirrored for a provider, or nil
 // when it has none yet.
-func regionsFor(account *v1alpha1.CloudAccount, provider v1alpha1.Provider) []string {
+func regionsFor(account *cloudv1.CloudAccount, provider cloudv1.Provider) []string {
 	for _, entry := range account.Status.Providers {
 		if entry.Provider == provider {
 			return entry.Regions
@@ -40,7 +40,7 @@ func regionsFor(account *v1alpha1.CloudAccount, provider v1alpha1.Provider) []st
 // account mirrored into status. The names are not what anyone guesses: RavenDB
 // Cloud parses the field into a fixed list of versioned channels, so "Stable"
 // is not a channel and "Stable72" is.
-func validateReleaseChannel(account *v1alpha1.CloudAccount, channel, field string) error {
+func validateReleaseChannel(account *cloudv1.CloudAccount, channel, field string) error {
 	if len(account.Status.ReleaseChannels) == 0 {
 		return nil
 	}
@@ -56,7 +56,7 @@ func validateReleaseChannel(account *v1alpha1.CloudAccount, channel, field strin
 		field, channel, strings.Join(available, ", "))
 }
 
-func validateInstanceType(available []cloudapi.InstanceType, name string, tier v1alpha1.Tier) error {
+func validateInstanceType(available []cloudapi.InstanceType, name string, tier cloudv1.Tier) error {
 	var forTier []string
 	var found *cloudapi.InstanceType
 	for i, it := range available {
@@ -96,7 +96,7 @@ func smallestDiskFor(available []cloudapi.InstanceType, name string) int32 {
 // validateStorage checks a requested disk against what the chosen instance type
 // offers. RavenDB Cloud sells whole disks off a fixed menu per shape, and an
 // off-menu size is a 400 that reads like a server problem rather than a typo.
-func validateStorage(available []cloudapi.InstanceType, name string, storage v1alpha1.StorageSpec, provider v1alpha1.Provider) error {
+func validateStorage(available []cloudapi.InstanceType, name string, storage cloudv1.StorageSpec, provider cloudv1.Provider) error {
 	instanceType := findInstanceType(available, name)
 	if instanceType == nil {
 		return nil
@@ -164,7 +164,7 @@ func findInstanceType(available []cloudapi.InstanceType, name string) *cloudapi.
 	return nil
 }
 
-func findStorageOffer(offers []cloudapi.StorageOffer, want v1alpha1.StorageType) *cloudapi.StorageOffer {
+func findStorageOffer(offers []cloudapi.StorageOffer, want cloudv1.StorageType) *cloudapi.StorageOffer {
 	for i := range offers {
 		if offers[i].Type == cloudapi.StorageType(want) {
 			return &offers[i]

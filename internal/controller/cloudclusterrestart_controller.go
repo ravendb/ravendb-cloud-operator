@@ -21,7 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudclients"
 )
@@ -52,7 +52,7 @@ type CloudClusterRestartReconciler struct {
 
 // Reconcile carries one restart from requested to finished.
 func (r *CloudClusterRestartReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	var restart v1alpha1.CloudClusterRestart
+	var restart cloudv1.CloudClusterRestart
 	if err := r.Get(ctx, req.NamespacedName, &restart); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -96,11 +96,11 @@ func (r *CloudClusterRestartReconciler) Reconcile(ctx context.Context, req ctrl.
 // with its cluster can be seen first, and one held back by the cluster's policy
 // runs once the policy allows it. The cluster watch wakes it either way.
 func (r *CloudClusterRestartReconciler) resolveCluster(
-	ctx context.Context, restart *v1alpha1.CloudClusterRestart,
-) (*v1alpha1.CloudCluster, cloudapi.Client, ctrl.Result, error) {
+	ctx context.Context, restart *cloudv1.CloudClusterRestart,
+) (*cloudv1.CloudCluster, cloudapi.Client, ctrl.Result, error) {
 	ref := types.NamespacedName{Namespace: restart.Namespace, Name: restart.Spec.ClusterRef.Name}
 
-	var cluster v1alpha1.CloudCluster
+	var cluster cloudv1.CloudCluster
 	if err := r.Get(ctx, ref, &cluster); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil, r.waiting(ctx, restart, fmt.Sprintf(
@@ -112,7 +112,7 @@ func (r *CloudClusterRestartReconciler) resolveCluster(
 
 	// A restart changes the cluster, so the policy applies here too.
 	if !cluster.MayMutate() {
-		r.complete(ctx, restart, v1alpha1.ReasonWaiting, mayNotMutateMessage(&cluster))
+		r.complete(ctx, restart, cloudv1.ReasonWaiting, mayNotMutateMessage(&cluster))
 		return nil, nil, ctrl.Result{}, nil
 	}
 
@@ -134,14 +134,14 @@ func (r *CloudClusterRestartReconciler) resolveCluster(
 
 // waiting says what the restart waits for, and looks again after pendingRequeue.
 func (r *CloudClusterRestartReconciler) waiting(
-	ctx context.Context, restart *v1alpha1.CloudClusterRestart, message string,
+	ctx context.Context, restart *cloudv1.CloudClusterRestart, message string,
 ) ctrl.Result {
-	r.complete(ctx, restart, v1alpha1.ReasonWaiting, message)
+	r.complete(ctx, restart, cloudv1.ReasonWaiting, message)
 	return ctrl.Result{RequeueAfter: pendingRequeue}
 }
 
 // mayNotMutateMessage says that the cluster's policy holds the restart back.
-func mayNotMutateMessage(cluster *v1alpha1.CloudCluster) string {
+func mayNotMutateMessage(cluster *cloudv1.CloudCluster) string {
 	return fmt.Sprintf(
 		"CloudCluster %q has managementPolicy %s, so the operator may not change it. To let this run, %s.",
 		cluster.Name, cluster.EffectiveManagementPolicy(), howToAllowChanges(cluster))
@@ -150,21 +150,21 @@ func mayNotMutateMessage(cluster *v1alpha1.CloudCluster) string {
 // issue sends the restart, once.
 func (r *CloudClusterRestartReconciler) issue(
 	ctx context.Context,
-	original, restart *v1alpha1.CloudClusterRestart,
-	cluster *v1alpha1.CloudCluster,
+	original, restart *cloudv1.CloudClusterRestart,
+	cluster *cloudv1.CloudCluster,
 	cloud cloudapi.Client,
 ) (ctrl.Result, error) {
 	// RavenDB Cloud refuses a restart on a cluster that is not Active, and
 	// status.nodeTags is only populated once the cluster has been read.
 	if !cluster.IsRunning() {
-		r.complete(ctx, restart, v1alpha1.ReasonWaiting, fmt.Sprintf(
+		r.complete(ctx, restart, cloudv1.ReasonWaiting, fmt.Sprintf(
 			"CloudCluster %q is %s, and RavenDB Cloud only restarts a node on a cluster that is Running.",
-			cluster.Name, orNotReconciled(v1alpha1.ConditionReason(cluster.Status.Conditions, v1alpha1.ConditionReady))))
+			cluster.Name, orNotReconciled(cloudv1.ConditionReason(cluster.Status.Conditions, cloudv1.ConditionReady))))
 		return ctrl.Result{RequeueAfter: cluster.EffectiveTransitionalInterval()}, nil
 	}
 
 	if !slices.Contains(cluster.Status.NodeTags, restart.Spec.NodeTag) {
-		r.complete(ctx, restart, v1alpha1.ReasonFailed, fmt.Sprintf(
+		r.complete(ctx, restart, cloudv1.ReasonFailed, fmt.Sprintf(
 			"CloudCluster %q has no node %q; it has %v. A CloudClusterRestart cannot be edited, so create a new "+
 				"one naming one of those.", cluster.Name, restart.Spec.NodeTag, cluster.Status.NodeTags))
 		return ctrl.Result{}, nil
@@ -174,7 +174,7 @@ func (r *CloudClusterRestartReconciler) issue(
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		r.complete(ctx, restart, v1alpha1.ReasonWaiting, fmt.Sprintf(
+		r.complete(ctx, restart, cloudv1.ReasonWaiting, fmt.Sprintf(
 			"CloudClusterRestart %q is restarting a node of CloudCluster %q, so this one waits for it to finish.",
 			other, cluster.Name))
 		return ctrl.Result{RequeueAfter: cluster.EffectiveTransitionalInterval()}, nil
@@ -184,12 +184,12 @@ func (r *CloudClusterRestartReconciler) issue(
 	// or a change sent since leaves the cluster busy for minutes.
 	observed, err := cloud.GetCluster(ctx, cluster.Status.ProductID)
 	if err != nil {
-		r.complete(ctx, restart, v1alpha1.ReasonWaiting, sentence(fmt.Sprintf(
+		r.complete(ctx, restart, cloudv1.ReasonWaiting, sentence(fmt.Sprintf(
 			"Could not read CloudCluster %q from RavenDB Cloud: %s", cluster.Name, cloudSaid(err)))+" Retrying.")
 		return ctrl.Result{}, err
 	}
 	if !observed.Status.IsServing() {
-		r.complete(ctx, restart, v1alpha1.ReasonWaiting, fmt.Sprintf(
+		r.complete(ctx, restart, cloudv1.ReasonWaiting, fmt.Sprintf(
 			"RavenDB Cloud reports CloudCluster %q %s, and restarts a node only on an Active cluster.",
 			cluster.Name, observed.Status))
 		return ctrl.Result{RequeueAfter: cluster.EffectiveTransitionalInterval()}, nil
@@ -201,7 +201,7 @@ func (r *CloudClusterRestartReconciler) issue(
 	// what is stored.
 	issued := metav1.Now()
 	restart.Status.IssuedAt = &issued
-	r.complete(ctx, restart, v1alpha1.ReasonRestarting,
+	r.complete(ctx, restart, cloudv1.ReasonRestarting,
 		fmt.Sprintf("Asking RavenDB Cloud to restart node %s of %s.", restart.Spec.NodeTag, cluster.Status.ProductID))
 	if err := r.Status().Update(ctx, restart); err != nil {
 		return ctrl.Result{}, err
@@ -212,7 +212,7 @@ func (r *CloudClusterRestartReconciler) issue(
 		return r.restartFailure(ctx, restart, cluster, err)
 	}
 
-	emit(r.Recorder, restart, corev1.EventTypeNormal, v1alpha1.EventRestarting,
+	emit(r.Recorder, restart, corev1.EventTypeNormal, cloudv1.EventRestarting,
 		"Restarting node %s of CloudCluster %q (%s).", restart.Spec.NodeTag, cluster.Name, cluster.Status.ProductID)
 	log.FromContext(ctx).Info("restart issued",
 		"cluster", cluster.Name, "productID", cluster.Status.ProductID, "node", restart.Spec.NodeTag)
@@ -227,8 +227,8 @@ func (r *CloudClusterRestartReconciler) issue(
 // short, so one request per pass is the right price.
 func (r *CloudClusterRestartReconciler) awaitCompletion(
 	ctx context.Context,
-	restart *v1alpha1.CloudClusterRestart,
-	cluster *v1alpha1.CloudCluster,
+	restart *cloudv1.CloudClusterRestart,
+	cluster *cloudv1.CloudCluster,
 	cloud cloudapi.Client,
 ) (ctrl.Result, error) {
 	observed, err := cloud.GetCluster(ctx, cluster.Status.ProductID)
@@ -238,12 +238,12 @@ func (r *CloudClusterRestartReconciler) awaitCompletion(
 
 	switch {
 	case observed.Status.IsTransitional():
-		r.complete(ctx, restart, v1alpha1.ReasonRestarting, fmt.Sprintf(
+		r.complete(ctx, restart, cloudv1.ReasonRestarting, fmt.Sprintf(
 			"Node %s is restarting; RavenDB Cloud reports %s.", restart.Spec.NodeTag, observed.Status))
 		return ctrl.Result{RequeueAfter: cluster.EffectiveTransitionalInterval()}, nil
 	case !observed.Status.IsServing():
 		// That is the restart's outcome, not a reason to keep waiting.
-		r.complete(ctx, restart, v1alpha1.ReasonFailed, fmt.Sprintf(
+		r.complete(ctx, restart, cloudv1.ReasonFailed, fmt.Sprintf(
 			"Node %s was restarted and RavenDB Cloud now reports the cluster %s; CloudCluster %q says what that means.",
 			restart.Spec.NodeTag, observed.Status, cluster.Name))
 		return ctrl.Result{}, nil
@@ -251,9 +251,9 @@ func (r *CloudClusterRestartReconciler) awaitCompletion(
 
 	completed := metav1.Now()
 	restart.Status.CompletedAt = &completed
-	r.complete(ctx, restart, v1alpha1.ReasonSucceeded, fmt.Sprintf(
+	r.complete(ctx, restart, cloudv1.ReasonSucceeded, fmt.Sprintf(
 		"Node %s restarted; RavenDB Cloud reports the cluster %s.", restart.Spec.NodeTag, observed.Status))
-	emit(r.Recorder, restart, corev1.EventTypeNormal, v1alpha1.EventRestarted,
+	emit(r.Recorder, restart, corev1.EventTypeNormal, cloudv1.EventRestarted,
 		"Node %s of CloudCluster %q restarted.", restart.Spec.NodeTag, cluster.Name)
 	return ctrl.Result{}, nil
 }
@@ -262,15 +262,15 @@ func (r *CloudClusterRestartReconciler) awaitCompletion(
 // cluster that is gone settles the restart; any other failure says nothing
 // about the node, so the restart keeps waiting.
 func (r *CloudClusterRestartReconciler) completionUnknown(
-	ctx context.Context, restart *v1alpha1.CloudClusterRestart, cluster *v1alpha1.CloudCluster, err error,
+	ctx context.Context, restart *cloudv1.CloudClusterRestart, cluster *cloudv1.CloudCluster, err error,
 ) (ctrl.Result, error) {
 	if cloudapi.IsNotFound(err) {
-		r.complete(ctx, restart, v1alpha1.ReasonFailed, fmt.Sprintf(
+		r.complete(ctx, restart, cloudv1.ReasonFailed, fmt.Sprintf(
 			"RavenDB Cloud has no cluster %s any more, so whether node %s came back cannot be established.",
 			cluster.Status.ProductID, restart.Spec.NodeTag))
 		return ctrl.Result{}, nil
 	}
-	r.complete(ctx, restart, v1alpha1.ReasonRestarting, sentence(fmt.Sprintf(
+	r.complete(ctx, restart, cloudv1.ReasonRestarting, sentence(fmt.Sprintf(
 		"Could not ask RavenDB Cloud whether node %s came back: %s", restart.Spec.NodeTag, cloudSaid(err)))+" Still waiting.")
 	if cloudapi.IsRetryable(err) {
 		return ctrl.Result{}, err
@@ -284,29 +284,29 @@ func (r *CloudClusterRestartReconciler) completionUnknown(
 // so they are unstamped and tried again. Any other 4xx will be refused again,
 // and the spec cannot change, so it is terminal.
 func (r *CloudClusterRestartReconciler) restartFailure(
-	ctx context.Context, restart *v1alpha1.CloudClusterRestart, cluster *v1alpha1.CloudCluster, err error,
+	ctx context.Context, restart *cloudv1.CloudClusterRestart, cluster *cloudv1.CloudCluster, err error,
 ) (ctrl.Result, error) {
 	soon := ctrl.Result{RequeueAfter: cluster.EffectiveTransitionalInterval()}
 	switch {
 	case cloudapi.MayHaveApplied(err):
-		r.complete(ctx, restart, v1alpha1.ReasonRestarting, sentence(fmt.Sprintf(
+		r.complete(ctx, restart, cloudv1.ReasonRestarting, sentence(fmt.Sprintf(
 			"RavenDB Cloud did not confirm the restart of node %s: %s", restart.Spec.NodeTag, cloudSaid(err)))+
 			" Checking whether it is under way rather than asking again.")
 		return soon, nil
 	case cloudapi.IsBusy(err):
 		restart.Status.IssuedAt = nil
-		r.complete(ctx, restart, v1alpha1.ReasonWaiting, sentence(fmt.Sprintf(
+		r.complete(ctx, restart, cloudv1.ReasonWaiting, sentence(fmt.Sprintf(
 			"RavenDB Cloud will not restart node %s while the cluster is busy: %s", restart.Spec.NodeTag, cloudSaid(err)))+
 			" Asking again once it is Active.")
 		return soon, nil
 	case cloudapi.IsRetryable(err):
 		restart.Status.IssuedAt = nil
-		r.complete(ctx, restart, v1alpha1.ReasonWaiting, sentence(fmt.Sprintf(
+		r.complete(ctx, restart, cloudv1.ReasonWaiting, sentence(fmt.Sprintf(
 			"Could not ask RavenDB Cloud to restart node %s: %s", restart.Spec.NodeTag, cloudSaid(err)))+" Retrying.")
 		return ctrl.Result{}, err
 	}
 
-	r.complete(ctx, restart, v1alpha1.ReasonFailed,
+	r.complete(ctx, restart, cloudv1.ReasonFailed,
 		sentence(fmt.Sprintf("RavenDB Cloud refused to restart node %s: %s", restart.Spec.NodeTag, cloudSaid(err)))+
 			" A CloudClusterRestart runs once, so create a new one to try again.")
 	return ctrl.Result{}, nil
@@ -316,9 +316,9 @@ func (r *CloudClusterRestartReconciler) restartFailure(
 // and has not finished, or returns "". RavenDB Cloud restarts one node at a
 // time, and a second request while the first runs is refused.
 func (r *CloudClusterRestartReconciler) restartUnderWay(
-	ctx context.Context, restart *v1alpha1.CloudClusterRestart,
+	ctx context.Context, restart *cloudv1.CloudClusterRestart,
 ) (string, error) {
-	var restarts v1alpha1.CloudClusterRestartList
+	var restarts cloudv1.CloudClusterRestartList
 	if err := r.List(ctx, &restarts, client.InNamespace(restart.Namespace)); err != nil {
 		return "", err
 	}
@@ -334,7 +334,7 @@ func (r *CloudClusterRestartReconciler) restartUnderWay(
 // adopt makes the restart a child of the cluster it acts on, so deleting the
 // cluster collects its records.
 func (r *CloudClusterRestartReconciler) adopt(
-	ctx context.Context, restart *v1alpha1.CloudClusterRestart, cluster *v1alpha1.CloudCluster,
+	ctx context.Context, restart *cloudv1.CloudClusterRestart, cluster *cloudv1.CloudCluster,
 ) error {
 	if metav1.IsControlledBy(restart, cluster) {
 		return nil
@@ -347,7 +347,7 @@ func (r *CloudClusterRestartReconciler) adopt(
 }
 
 func (r *CloudClusterRestartReconciler) finish(
-	ctx context.Context, original, restart *v1alpha1.CloudClusterRestart, result ctrl.Result, err error,
+	ctx context.Context, original, restart *cloudv1.CloudClusterRestart, result ctrl.Result, err error,
 ) (ctrl.Result, error) {
 	return writeStatus(ctx, r.Client, restart, &original.Status, &restart.Status, result, err)
 }
@@ -363,7 +363,7 @@ func orNotReconciled(reason string) string {
 // indexRestartsByClusterRef indexes a CloudClusterRestart by the cluster it
 // names.
 func indexRestartsByClusterRef(obj client.Object) []string {
-	restart, ok := obj.(*v1alpha1.CloudClusterRestart)
+	restart, ok := obj.(*cloudv1.CloudClusterRestart)
 	if !ok || restart.Spec.ClusterRef.Name == "" {
 		return nil
 	}
@@ -373,7 +373,7 @@ func indexRestartsByClusterRef(obj client.Object) []string {
 // SetupWithManager wires the controller and the cluster watch it waits on.
 func (r *CloudClusterRestartReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(),
-		&v1alpha1.CloudClusterRestart{}, clusterRefIndex, indexRestartsByClusterRef); err != nil {
+		&cloudv1.CloudClusterRestart{}, clusterRefIndex, indexRestartsByClusterRef); err != nil {
 		return err
 	}
 
@@ -383,10 +383,10 @@ func (r *CloudClusterRestartReconciler) SetupWithManager(mgr ctrl.Manager) error
 	options.MaxConcurrentReconciles = 1
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.CloudClusterRestart{}, builder.WithPredicates(ignoreStatusOnlyUpdates())).
+		For(&cloudv1.CloudClusterRestart{}, builder.WithPredicates(ignoreStatusOnlyUpdates())).
 		// A waiting restart waits for its cluster to become Ready. Not Owns: the
 		// cluster is the owner here.
-		Watches(&v1alpha1.CloudCluster{}, handler.EnqueueRequestsFromMapFunc(r.restartsWaitingOn)).
+		Watches(&cloudv1.CloudCluster{}, handler.EnqueueRequestsFromMapFunc(r.restartsWaitingOn)).
 		WithOptions(options).
 		Named("cloudclusterrestart").
 		Complete(r)
@@ -396,7 +396,7 @@ func (r *CloudClusterRestartReconciler) SetupWithManager(mgr ctrl.Manager) error
 // ones are skipped: a cluster writes status every poll, and every restart it
 // ever had would otherwise be woken each time.
 func (r *CloudClusterRestartReconciler) restartsWaitingOn(ctx context.Context, obj client.Object) []reconcile.Request {
-	var list v1alpha1.CloudClusterRestartList
+	var list cloudv1.CloudClusterRestartList
 	if err := r.List(ctx, &list,
 		client.InNamespace(obj.GetNamespace()),
 		client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(clusterRefIndex, obj.GetName())},

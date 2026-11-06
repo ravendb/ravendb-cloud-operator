@@ -97,7 +97,7 @@ test-unit: generate manifests vet ## Unit: pure Go. Seconds, runs anywhere.
 	CGO_ENABLED=1 $(GO) go test -race ./... -count=1
 	@echo
 	@echo "  Note: unless KUBEBUILDER_ASSETS is set in your environment, the CEL"
-	@echo "  and defaulting tests in api/v1alpha1 just skipped. They need a real"
+	@echo "  and defaulting tests in api/v1 just skipped. They need a real"
 	@echo "  API server: 'make test-integration' provides one."
 	@echo
 

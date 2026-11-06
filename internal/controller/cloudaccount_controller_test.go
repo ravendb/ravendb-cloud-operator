@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 )
 
 func (h *harness) reconcileAccount(name string) ctrl.Result {
@@ -29,9 +29,9 @@ func (h *harness) reconcileAccount(name string) ctrl.Result {
 	return result
 }
 
-func (h *harness) getAccount(name string) *v1alpha1.CloudAccount {
+func (h *harness) getAccount(name string) *cloudv1.CloudAccount {
 	h.t.Helper()
-	var account v1alpha1.CloudAccount
+	var account cloudv1.CloudAccount
 	if err := h.k8s.Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: name}, &account); err != nil {
 		h.t.Fatalf("getting CloudAccount %s: %v", name, err)
 	}
@@ -39,11 +39,11 @@ func (h *harness) getAccount(name string) *v1alpha1.CloudAccount {
 }
 
 // unverifiedAccount is a CloudAccount as the user just applied it: no status.
-func unverifiedAccount() *v1alpha1.CloudAccount {
-	return &v1alpha1.CloudAccount{
+func unverifiedAccount() *cloudv1.CloudAccount {
+	return &cloudv1.CloudAccount{
 		ObjectMeta: metav1.ObjectMeta{Name: testAccountName, Namespace: testNamespace},
-		Spec: v1alpha1.CloudAccountSpec{
-			APIKeySecretRef: v1alpha1.SecretKeySelector{Name: testSecretName, Key: "apiKey"},
+		Spec: cloudv1.CloudAccountSpec{
+			APIKeySecretRef: cloudv1.SecretKeySelector{Name: testSecretName, Key: "apiKey"},
 		},
 	}
 }
@@ -54,7 +54,7 @@ func TestAccountBecomesReadyAndCachesRegions(t *testing.T) {
 	h.reconcileAccount(testAccountName)
 	account := h.getAccount(testAccountName)
 
-	if !meta.IsStatusConditionTrue(account.Status.Conditions, v1alpha1.ConditionReady) {
+	if !meta.IsStatusConditionTrue(account.Status.Conditions, cloudv1.ConditionReady) {
 		t.Fatalf("account is not Ready: %+v", account.Status.Conditions)
 	}
 	if account.Status.DomainName != "example.ravendb.cloud" {
@@ -97,11 +97,11 @@ func TestAccountNotReadyWhenSecretIsMissing(t *testing.T) {
 	result := h.reconcileAccount(testAccountName)
 	account := h.getAccount(testAccountName)
 
-	if meta.IsStatusConditionTrue(account.Status.Conditions, v1alpha1.ConditionReady) {
+	if meta.IsStatusConditionTrue(account.Status.Conditions, cloudv1.ConditionReady) {
 		t.Fatal("account should not be Ready without a credential")
 	}
-	cond := meta.FindStatusCondition(account.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonKeyMissing {
+	cond := meta.FindStatusCondition(account.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonKeyMissing {
 		t.Fatalf("Ready condition = %+v, want reason KeyMissing", cond)
 	}
 	if !contains(cond.Message, testSecretName) {
@@ -120,7 +120,7 @@ func TestAccountNotReadyWhenSecretKeyIsWrong(t *testing.T) {
 	h.reconcileAccount(testAccountName)
 	account := h.getAccount(testAccountName)
 
-	cond := meta.FindStatusCondition(account.Status.Conditions, v1alpha1.ConditionReady)
+	cond := meta.FindStatusCondition(account.Status.Conditions, cloudv1.ConditionReady)
 	if cond == nil || cond.Status != metav1.ConditionFalse {
 		t.Fatalf("Ready = %+v, want False", cond)
 	}
@@ -139,8 +139,8 @@ func TestAccountWithRejectedKeyIsNotRetriedTightly(t *testing.T) {
 	result := h.reconcileAccount(testAccountName)
 	account := h.getAccount(testAccountName)
 
-	cond := meta.FindStatusCondition(account.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonKeyRejected {
+	cond := meta.FindStatusCondition(account.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonKeyRejected {
 		t.Fatalf("Ready condition = %+v, want reason KeyRejected", cond)
 	}
 	// A rejected key needs a human, so the controller backs off rather than
@@ -166,8 +166,8 @@ func TestAccountSurfacesTransportErrors(t *testing.T) {
 	}
 
 	account := h.getAccount(testAccountName)
-	cond := meta.FindStatusCondition(account.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonCloudUnreachable {
+	cond := meta.FindStatusCondition(account.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonCloudUnreachable {
 		t.Fatalf("Ready condition = %+v, want reason CloudUnreachable", cond)
 	}
 }
@@ -177,16 +177,16 @@ func TestAccountsUsingSecretMapsBackToAccounts(t *testing.T) {
 	// waiting out the hourly resync. The two decoys pin the other half of that
 	// sentence: an account on a different Secret, and a same-named account in
 	// another namespace, must both be left asleep.
-	usesAnotherSecret := &v1alpha1.CloudAccount{
+	usesAnotherSecret := &cloudv1.CloudAccount{
 		ObjectMeta: metav1.ObjectMeta{Name: "other-account", Namespace: testNamespace},
-		Spec: v1alpha1.CloudAccountSpec{
-			APIKeySecretRef: v1alpha1.SecretKeySelector{Name: "another-api-key", Key: "apiKey"},
+		Spec: cloudv1.CloudAccountSpec{
+			APIKeySecretRef: cloudv1.SecretKeySelector{Name: "another-api-key", Key: "apiKey"},
 		},
 	}
-	inAnotherNamespace := &v1alpha1.CloudAccount{
+	inAnotherNamespace := &cloudv1.CloudAccount{
 		ObjectMeta: metav1.ObjectMeta{Name: testAccountName, Namespace: "elsewhere"},
-		Spec: v1alpha1.CloudAccountSpec{
-			APIKeySecretRef: v1alpha1.SecretKeySelector{Name: testSecretName, Key: "apiKey"},
+		Spec: cloudv1.CloudAccountSpec{
+			APIKeySecretRef: cloudv1.SecretKeySelector{Name: testSecretName, Key: "apiKey"},
 		},
 	}
 	h := newHarness(t, credentialSecret(), unverifiedAccount(), usesAnotherSecret, inAnotherNamespace)
@@ -224,9 +224,9 @@ func TestAccountWaitsForTheClustersUsingIt(t *testing.T) {
 	if !hasFinalizer(account) {
 		t.Fatal("the finalizer was released while two clusters still referenced the account")
 	}
-	ready := meta.FindStatusCondition(account.Status.Conditions, v1alpha1.ConditionReady)
-	if ready == nil || ready.Reason != v1alpha1.ReasonInUse {
-		t.Fatalf("Ready condition = %+v, want reason %s", ready, v1alpha1.ReasonInUse)
+	ready := meta.FindStatusCondition(account.Status.Conditions, cloudv1.ConditionReady)
+	if ready == nil || ready.Reason != cloudv1.ReasonInUse {
+		t.Fatalf("Ready condition = %+v, want reason %s", ready, cloudv1.ReasonInUse)
 	}
 	// Named, and in a stable order, because the message is how a user finds out
 	// what to delete first.
@@ -252,7 +252,7 @@ func TestAccountIsReleasedOnceNothingUsesIt(t *testing.T) {
 		t.Fatal("released while a cluster still referenced it")
 	}
 
-	var cluster v1alpha1.CloudCluster
+	var cluster cloudv1.CloudCluster
 	key := types.NamespacedName{Namespace: testNamespace, Name: "orders"}
 	if err := h.k8s.Get(context.Background(), key, &cluster); err != nil {
 		t.Fatalf("getting the cluster: %v", err)
@@ -263,7 +263,7 @@ func TestAccountIsReleasedOnceNothingUsesIt(t *testing.T) {
 
 	h.reconcileAccount(testAccountName)
 
-	var account v1alpha1.CloudAccount
+	var account cloudv1.CloudAccount
 	err := h.k8s.Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testAccountName}, &account)
 	if err == nil && hasFinalizer(&account) {
 		t.Fatal("the finalizer survived the last cluster going away")
@@ -281,7 +281,7 @@ func TestAccountWithNoClustersDeletesImmediately(t *testing.T) {
 	h.deleteAccount(testAccountName)
 	h.reconcileAccount(testAccountName)
 
-	var account v1alpha1.CloudAccount
+	var account cloudv1.CloudAccount
 	err := h.k8s.Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: testAccountName}, &account)
 	if err == nil && hasFinalizer(&account) {
 		t.Fatal("an unused account still holds its finalizer")
@@ -291,7 +291,7 @@ func TestAccountWithNoClustersDeletesImmediately(t *testing.T) {
 	}
 }
 
-func hasFinalizer(account *v1alpha1.CloudAccount) bool {
+func hasFinalizer(account *cloudv1.CloudAccount) bool {
 	return controllerutil.ContainsFinalizer(account, accountFinalizer)
 }
 
@@ -323,8 +323,8 @@ func TestAHeldAccountCountsAClusterThatArrivedAfterTheDelete(t *testing.T) {
 	h.deleteAccount(testAccountName)
 	h.reconcileAccount(testAccountName)
 
-	held := meta.FindStatusCondition(h.getAccount(testAccountName).Status.Conditions, v1alpha1.ConditionReady)
-	if held == nil || held.Reason != v1alpha1.ReasonInUse {
+	held := meta.FindStatusCondition(h.getAccount(testAccountName).Status.Conditions, cloudv1.ConditionReady)
+	if held == nil || held.Reason != cloudv1.ReasonInUse {
 		t.Fatalf("Ready = %+v, want reason InUse", held)
 	}
 	if !contains(held.Message, "1 CloudCluster") {
@@ -348,7 +348,7 @@ func TestAHeldAccountCountsAClusterThatArrivedAfterTheDelete(t *testing.T) {
 	}
 
 	h.reconcileAccount(testAccountName)
-	after := meta.FindStatusCondition(h.getAccount(testAccountName).Status.Conditions, v1alpha1.ConditionReady)
+	after := meta.FindStatusCondition(h.getAccount(testAccountName).Status.Conditions, cloudv1.ConditionReady)
 	if after == nil || !contains(after.Message, "2 CloudCluster") {
 		t.Errorf("message %q does not count the cluster that arrived after the delete", after.Message)
 	}
@@ -394,7 +394,7 @@ func TestACatalogueFromAnotherAccountIsNotKept(t *testing.T) {
 	stale := fresh.DeepCopy()
 	stale.Status.DomainName = "elsewhere.example"
 	stale.Status.DefaultReleaseChannel = "Stale99"
-	stale.Status.ReleaseChannels = []v1alpha1.ReleaseChannelStatus{{Name: "Stale99"}}
+	stale.Status.ReleaseChannels = []cloudv1.ReleaseChannelStatus{{Name: "Stale99"}}
 	if err := h.k8s.Status().Update(ctx, stale); err != nil {
 		t.Fatalf("staging a catalogue from another account: %v", err)
 	}
@@ -422,7 +422,7 @@ func TestASpecChangeRefetchesTheCatalogue(t *testing.T) {
 
 	stale := h.getAccount(testAccountName).DeepCopy()
 	stale.Status.DefaultReleaseChannel = "Stale99"
-	stale.Status.ReleaseChannels = []v1alpha1.ReleaseChannelStatus{{Name: "Stale99"}}
+	stale.Status.ReleaseChannels = []cloudv1.ReleaseChannelStatus{{Name: "Stale99"}}
 	stale.Status.ObservedGeneration = stale.Generation + 1
 	if err := h.k8s.Status().Update(ctx, stale); err != nil {
 		t.Fatalf("staging a catalogue taken for another spec: %v", err)

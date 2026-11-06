@@ -18,7 +18,7 @@ metadata:
 stringData:
   apiKey: lab-api-key
 ---
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata:
   name: lab01-account

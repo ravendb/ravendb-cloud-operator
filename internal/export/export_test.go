@@ -12,7 +12,7 @@ import (
 	"golang.org/x/time/rate"
 	"sigs.k8s.io/yaml"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudsim"
 )
@@ -63,7 +63,7 @@ func TestAnExportDescribesTheClusterAsItRuns(t *testing.T) {
 	}
 	got := docs[0]
 
-	if got.APIVersion != "cloud.ravendb.net/v1alpha1" || got.Kind != "CloudCluster" {
+	if got.APIVersion != "cloud.ravendb.net/v1" || got.Kind != "CloudCluster" {
 		t.Errorf("apiVersion %q kind %q, want a CloudCluster", got.APIVersion, got.Kind)
 	}
 	// The object name has to be a valid Kubernetes name, and the display name,
@@ -75,14 +75,14 @@ func TestAnExportDescribesTheClusterAsItRuns(t *testing.T) {
 	if spec.DisplayName != "Legacy Prod" || spec.AccountRef.Name != "ravendb-cloud" {
 		t.Errorf("displayName %q accountRef %q", spec.DisplayName, spec.AccountRef.Name)
 	}
-	if spec.Tier != v1alpha1.TierProduction || spec.InstanceType != "PB20" ||
-		spec.Provider != v1alpha1.ProviderAWS || spec.Region != "eu-central-1" || spec.ReleaseChannel != "Stable72" {
+	if spec.Tier != cloudv1.TierProduction || spec.InstanceType != "PB20" ||
+		spec.Provider != cloudv1.ProviderAWS || spec.Region != "eu-central-1" || spec.ReleaseChannel != "Stable72" {
 		t.Errorf("shape = %+v, want what the seeded cluster runs", spec)
 	}
 	if spec.Nodes == nil || *spec.Nodes != int32(len(seeded.NodeTags)) {
 		t.Errorf("nodes = %v, want %d", spec.Nodes, len(seeded.NodeTags))
 	}
-	if spec.Storage.SizeGB != 20 || spec.Storage.Type != v1alpha1.StorageSsdStandard {
+	if spec.Storage.SizeGB != 20 || spec.Storage.Type != cloudv1.StorageSsdStandard {
 		t.Errorf("storage = %+v, want the seeded 20 GiB SsdStandard", spec.Storage)
 	}
 	if len(spec.Networking.AllowedIPs) != 1 || spec.Networking.AllowedIPs[0] != "0.0.0.0/0" {
@@ -90,10 +90,10 @@ func TestAnExportDescribesTheClusterAsItRuns(t *testing.T) {
 	}
 	// Full, because the manifest matches: applying it changes nothing, and
 	// from then on editing it is how the cluster is changed.
-	if spec.CreationMode != v1alpha1.CreationTakeOverOnly {
+	if spec.CreationMode != cloudv1.CreationTakeOverOnly {
 		t.Errorf("creationMode = %q, want TakeOverOnly: applying this again must never create a cluster", spec.CreationMode)
 	}
-	if spec.ManagementPolicy != v1alpha1.ManagementFull {
+	if spec.ManagementPolicy != cloudv1.ManagementFull {
 		t.Errorf("managementPolicy = %q, want Full", spec.ManagementPolicy)
 	}
 	// Only sent on a create, and this cluster exists.

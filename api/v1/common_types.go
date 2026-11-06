@@ -1,4 +1,4 @@
-package v1alpha1
+package v1
 
 // The CRD uses the spellings people write, AWS and GCP. The cloud API spells
 // them Aws and Gcp; internal/cloudapi translates.

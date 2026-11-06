@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 )
 
@@ -24,7 +24,7 @@ const productIDIndex = ".status.productID"
 // indexClustersByProductID indexes a CloudCluster by the cluster it is bound
 // to.
 func indexClustersByProductID(obj client.Object) []string {
-	cluster, ok := obj.(*v1alpha1.CloudCluster)
+	cluster, ok := obj.(*cloudv1.CloudCluster)
 	if !ok || cluster.Status.ProductID == "" {
 		return nil
 	}
@@ -40,8 +40,8 @@ func indexClustersByProductID(obj client.Object) []string {
 // An empty id with a nil error means "not bound yet, requeue as instructed".
 func (r *CloudClusterReconciler) bind(
 	ctx context.Context,
-	original, cluster *v1alpha1.CloudCluster,
-	account *v1alpha1.CloudAccount,
+	original, cluster *cloudv1.CloudCluster,
+	account *cloudv1.CloudAccount,
 	cloud cloudapi.Client,
 ) (string, ctrl.Result, error) {
 	// status.productID outranks anything in spec.
@@ -69,22 +69,22 @@ func (r *CloudClusterReconciler) bind(
 // lookupName is the name to find this object's cluster by: the one a create
 // was sent with, if any, and the spec's otherwise. Trusting spec over the
 // submitted name is how an object ends up with a stranger's cluster.
-func lookupName(cluster *v1alpha1.CloudCluster) string {
+func lookupName(cluster *cloudv1.CloudCluster) string {
 	return cmp.Or(cluster.Status.ProvisionAttemptedName, cluster.EffectiveDisplayName())
 }
 
 // notBound says why the name did not bind this object, and polls again.
 func (r *CloudClusterReconciler) notBound(
-	ctx context.Context, cluster *v1alpha1.CloudCluster, message string,
+	ctx context.Context, cluster *cloudv1.CloudCluster, message string,
 ) (string, ctrl.Result, error) {
-	r.ready(ctx, cluster, v1alpha1.ReasonNameTaken, message)
+	r.ready(ctx, cluster, cloudv1.ReasonNameTaken, message)
 	return "", ctrl.Result{RequeueAfter: cluster.EffectivePollInterval()}, nil
 }
 
 // takeOver binds to a cluster the name found, unless it is not this object's to
 // bind.
 func (r *CloudClusterReconciler) takeOver(
-	ctx context.Context, cluster *v1alpha1.CloudCluster, cloud cloudapi.Client, ref *cloudapi.ClusterRef,
+	ctx context.Context, cluster *cloudv1.CloudCluster, cloud cloudapi.Client, ref *cloudapi.ClusterRef,
 ) (string, ctrl.Result, error) {
 	holder, err := r.holderOf(ctx, cluster, ref.ID)
 	if err != nil {
@@ -123,11 +123,11 @@ func (r *CloudClusterReconciler) takeOver(
 	// Checked after the identity: a create that may have landed is no reason to
 	// take a cluster this manifest would not have made.
 	if cluster.Status.ProvisionAttemptedAt != nil {
-		emit(r.Recorder, cluster, corev1.EventTypeNormal, v1alpha1.EventCreated,
+		emit(r.Recorder, cluster, corev1.EventTypeNormal, cloudv1.EventCreated,
 			"Found the cluster an interrupted create made: %q (%s).", ref.Name, ref.ID)
 		return ref.ID, ctrl.Result{}, nil
 	}
-	if cluster.EffectiveCreationMode() == v1alpha1.CreationCreateOnly {
+	if cluster.EffectiveCreationMode() == cloudv1.CreationCreateOnly {
 		return r.notBound(ctx, cluster, fmt.Sprintf(
 			"A RavenDB Cloud cluster named %q (%s) already exists, and creationMode CreateOnly never takes one over, "+
 				"so this object was not bound and nothing was changed. Set spec.displayName to another name to create "+
@@ -136,8 +136,8 @@ func (r *CloudClusterReconciler) takeOver(
 	}
 
 	cluster.Status.Adopted = true
-	if cluster.EffectiveCreationMode() == v1alpha1.CreationTakeOverOnly {
-		emit(r.Recorder, cluster, corev1.EventTypeNormal, v1alpha1.EventAdopted,
+	if cluster.EffectiveCreationMode() == cloudv1.CreationTakeOverOnly {
+		emit(r.Recorder, cluster, corev1.EventTypeNormal, cloudv1.EventAdopted,
 			"Found RavenDB Cloud cluster %q (%s) already running; %s.", ref.Name, ref.ID, howManaged(cluster))
 		return ref.ID, ctrl.Result{}, nil
 	}
@@ -146,7 +146,7 @@ func (r *CloudClusterReconciler) takeOver(
 	// object now publishes the found cluster's certificate.
 	// Admission keeps Terminate away from TakeOverOrCreate, so deleting this
 	// object always leaves the cluster running.
-	emit(r.Recorder, cluster, corev1.EventTypeWarning, v1alpha1.EventAdopted,
+	emit(r.Recorder, cluster, corev1.EventTypeWarning, cloudv1.EventAdopted,
 		"Found RavenDB Cloud cluster %q (%s) already running and took it over; %s. Nothing in the manifest asked "+
 			"for an existing cluster: set spec.creationMode to TakeOverOnly to confirm this one is meant. If it is "+
 			"not, delete this object, which leaves the cluster as it is, and apply it again with another displayName.",
@@ -156,7 +156,7 @@ func (r *CloudClusterReconciler) takeOver(
 
 // howManaged says what a found cluster is managed with, and how to change it
 // when that is the Observe default.
-func howManaged(cluster *v1alpha1.CloudCluster) string {
+func howManaged(cluster *cloudv1.CloudCluster) string {
 	if cluster.Spec.ManagementPolicy == "" {
 		return "managing it with managementPolicy Observe, which changes nothing until you " + howToAllowChanges(cluster)
 	}
@@ -166,12 +166,12 @@ func howManaged(cluster *v1alpha1.CloudCluster) string {
 // identityDifferences lists what a found cluster is that the manifest says it
 // is not, among the fields no change can fix: tier, and provider and region
 // where the manifest names them.
-func identityDifferences(spec *v1alpha1.CloudClusterSpec, observed *cloudapi.Cluster) []string {
+func identityDifferences(spec *cloudv1.CloudClusterSpec, observed *cloudapi.Cluster) []string {
 	var out []string
-	if v1alpha1.Tier(observed.Tier) != spec.Tier {
+	if cloudv1.Tier(observed.Tier) != spec.Tier {
 		out = append(out, fmt.Sprintf("it is %s and spec.tier says %s", observed.Tier, spec.Tier))
 	}
-	if spec.Provider != "" && v1alpha1.Provider(observed.Provider) != spec.Provider {
+	if spec.Provider != "" && cloudv1.Provider(observed.Provider) != spec.Provider {
 		out = append(out, fmt.Sprintf("it runs on %s and spec.provider says %s", observed.Provider, spec.Provider))
 	}
 	if spec.Region != "" && observed.Region != spec.Region {
@@ -182,8 +182,8 @@ func identityDifferences(spec *v1alpha1.CloudClusterSpec, observed *cloudapi.Clu
 
 // holderOf names another CloudCluster already bound to this RavenDB Cloud
 // cluster, or returns "" when there is none.
-func (r *CloudClusterReconciler) holderOf(ctx context.Context, cluster *v1alpha1.CloudCluster, productID string) (string, error) {
-	var list v1alpha1.CloudClusterList
+func (r *CloudClusterReconciler) holderOf(ctx context.Context, cluster *cloudv1.CloudCluster, productID string) (string, error) {
+	var list cloudv1.CloudClusterList
 	if err := r.List(ctx, &list, client.MatchingFields{productIDIndex: productID}); err != nil {
 		return "", fmt.Errorf("listing the CloudClusters bound to %s: %w", productID, err)
 	}
@@ -202,35 +202,35 @@ func (r *CloudClusterReconciler) holderOf(ctx context.Context, cluster *v1alpha1
 // leavingWithRetain reports a CloudCluster being deleted with deletionPolicy
 // Retain, which lets go of its cluster without touching it. One leaving with
 // Terminate still holds it: it is about to terminate that cluster.
-func leavingWithRetain(cluster *v1alpha1.CloudCluster) bool {
-	return !cluster.DeletionTimestamp.IsZero() && cluster.EffectiveDeletionPolicy() == v1alpha1.DeletionRetain
+func leavingWithRetain(cluster *cloudv1.CloudCluster) bool {
+	return !cluster.DeletionTimestamp.IsZero() && cluster.EffectiveDeletionPolicy() == cloudv1.DeletionRetain
 }
 
 // createUnlessForbidden creates the cluster the name did not find, when this
 // object may create one.
 func (r *CloudClusterReconciler) createUnlessForbidden(
 	ctx context.Context,
-	original, cluster *v1alpha1.CloudCluster,
-	account *v1alpha1.CloudAccount,
+	original, cluster *cloudv1.CloudCluster,
+	account *cloudv1.CloudAccount,
 	cloud cloudapi.Client,
 	name string,
 ) (string, ctrl.Result, error) {
 	poll := ctrl.Result{RequeueAfter: cluster.EffectivePollInterval()}
 	switch {
-	case cluster.EffectiveCreationMode() == v1alpha1.CreationTakeOverOnly:
-		r.ready(ctx, cluster, v1alpha1.ReasonClusterNotFound, fmt.Sprintf(
+	case cluster.EffectiveCreationMode() == cloudv1.CreationTakeOverOnly:
+		r.ready(ctx, cluster, cloudv1.ReasonClusterNotFound, fmt.Sprintf(
 			"No RavenDB Cloud cluster named %q in this account, and creationMode TakeOverOnly never creates one. "+
 				"If the name is wrong, correct spec.displayName; nothing was created.", name))
 		return "", poll, nil
-	case cluster.Spec.ManagementPolicy == v1alpha1.ManagementObserve:
-		r.ready(ctx, cluster, v1alpha1.ReasonClusterNotFound, fmt.Sprintf(
+	case cluster.Spec.ManagementPolicy == cloudv1.ManagementObserve:
+		r.ready(ctx, cluster, cloudv1.ReasonClusterNotFound, fmt.Sprintf(
 			"No RavenDB Cloud cluster named %q in this account, and managementPolicy Observe never creates one. "+
 				"Remove spec.managementPolicy to create it. If the name is wrong, correct spec.displayName; "+
 				"nothing was created.", name))
 		return "", poll, nil
-	case cluster.Spec.Tier == v1alpha1.TierFree:
+	case cluster.Spec.Tier == cloudv1.TierFree:
 		// The public API refuses to create a Free product.
-		r.ready(ctx, cluster, v1alpha1.ReasonClusterNotFound, fmt.Sprintf(
+		r.ready(ctx, cluster, cloudv1.ReasonClusterNotFound, fmt.Sprintf(
 			"No Free cluster named %q in this account, and Free clusters can only be created in the RavenDB Cloud "+
 				"portal. Create one named %q there and this object finds it within %s.",
 			name, name, cluster.EffectivePollInterval()))
@@ -242,8 +242,8 @@ func (r *CloudClusterReconciler) createUnlessForbidden(
 // create asks RavenDB Cloud for a new cluster.
 func (r *CloudClusterReconciler) create(
 	ctx context.Context,
-	original, cluster *v1alpha1.CloudCluster,
-	account *v1alpha1.CloudAccount,
+	original, cluster *cloudv1.CloudCluster,
+	account *cloudv1.CloudAccount,
 	cloud cloudapi.Client,
 ) (string, ctrl.Result, error) {
 	where, err := placementFor(cluster, account)
@@ -268,7 +268,7 @@ func (r *CloudClusterReconciler) create(
 	attempted := metav1.Now()
 	cluster.Status.ProvisionAttemptedAt = &attempted
 	cluster.Status.ProvisionAttemptedName = request.DisplayName
-	r.ready(ctx, cluster, v1alpha1.ReasonCreating, "Asking RavenDB Cloud for a new cluster.")
+	r.ready(ctx, cluster, cloudv1.ReasonCreating, "Asking RavenDB Cloud for a new cluster.")
 	if err := r.writeStatusNow(ctx, original, cluster); err != nil {
 		return "", ctrl.Result{}, err
 	}
@@ -285,7 +285,7 @@ func (r *CloudClusterReconciler) create(
 		result, err := r.createFailure(ctx, cluster, err)
 		return "", result, err
 	}
-	emit(r.Recorder, cluster, corev1.EventTypeNormal, v1alpha1.EventCreated,
+	emit(r.Recorder, cluster, corev1.EventTypeNormal, cloudv1.EventCreated,
 		"Created RavenDB Cloud cluster %q (%s) in %s/%s.", request.DisplayName, productID, request.Provider, request.Region)
 	log.FromContext(ctx).Info("created a RavenDB Cloud cluster",
 		"productID", productID, "displayName", request.DisplayName)
@@ -295,8 +295,8 @@ func (r *CloudClusterReconciler) create(
 
 // invalidSpec reports a spec the operator will not send, and waits for the
 // ordinary poll: a bad request is the user's to fix.
-func (r *CloudClusterReconciler) invalidSpec(ctx context.Context, cluster *v1alpha1.CloudCluster, err error) ctrl.Result {
-	r.ready(ctx, cluster, v1alpha1.ReasonInvalidSpec, sentence(err.Error()))
+func (r *CloudClusterReconciler) invalidSpec(ctx context.Context, cluster *cloudv1.CloudCluster, err error) ctrl.Result {
+	r.ready(ctx, cluster, cloudv1.ReasonInvalidSpec, sentence(err.Error()))
 	return ctrl.Result{RequeueAfter: cluster.EffectivePollInterval()}
 }
 
@@ -304,7 +304,7 @@ func (r *CloudClusterReconciler) invalidSpec(ctx context.Context, cluster *v1alp
 // the account's defaults, into a create request, validating it against what
 // RavenDB Cloud sells there so a failure reads like advice.
 func buildCreateRequest(
-	cluster *v1alpha1.CloudCluster,
+	cluster *cloudv1.CloudCluster,
 	where placement,
 	instanceTypes []cloudapi.InstanceType,
 ) (cloudapi.CreateClusterRequest, error) {
@@ -359,7 +359,7 @@ func buildCreateRequest(
 
 // chooseInstanceType is the spec's instance type, checked against the tier, or
 // the tier's smallest when the spec names none.
-func chooseInstanceType(available []cloudapi.InstanceType, spec *v1alpha1.CloudClusterSpec) (string, error) {
+func chooseInstanceType(available []cloudapi.InstanceType, spec *cloudv1.CloudClusterSpec) (string, error) {
 	if spec.InstanceType == "" {
 		return smallestForTier(available, spec.Tier)
 	}
@@ -369,10 +369,10 @@ func chooseInstanceType(available []cloudapi.InstanceType, spec *v1alpha1.CloudC
 // warnIfOpenToTheInternet says so when a cluster was created reachable from
 // anywhere. A warning rather than a refusal, because 0.0.0.0/0 is right for a
 // lab; it is also the value people copy out of a quickstart and forget.
-func (r *CloudClusterReconciler) warnIfOpenToTheInternet(cluster *v1alpha1.CloudCluster, allowedIPs []string) {
+func (r *CloudClusterReconciler) warnIfOpenToTheInternet(cluster *cloudv1.CloudCluster, allowedIPs []string) {
 	for _, entry := range allowedIPs {
 		if canonicalCIDR(entry) == "0.0.0.0/0" {
-			emit(r.Recorder, cluster, corev1.EventTypeWarning, v1alpha1.EventOpenAllowList,
+			emit(r.Recorder, cluster, corev1.EventTypeWarning, cloudv1.EventOpenAllowList,
 				"allowedIPs contains %s, so this cluster accepts connections from any address. "+
 					"That is fine for a lab and worth narrowing before it holds anything real.", entry)
 			return
@@ -383,7 +383,7 @@ func (r *CloudClusterReconciler) warnIfOpenToTheInternet(cluster *v1alpha1.Cloud
 // placement is where a cluster goes and who may reach it: the four fields a
 // CloudAccount can supply a house default for.
 type placement struct {
-	provider   v1alpha1.Provider
+	provider   cloudv1.Provider
 	region     string
 	channel    string
 	allowedIPs []string
@@ -393,12 +393,12 @@ type placement struct {
 // the result against what the account says RavenDB Cloud offers. Each field is
 // checked before the next is resolved, so a manifest wrong in two places
 // reports the earlier field.
-func placementFor(cluster *v1alpha1.CloudCluster, account *v1alpha1.CloudAccount) (placement, error) {
+func placementFor(cluster *cloudv1.CloudCluster, account *cloudv1.CloudAccount) (placement, error) {
 	spec := &cluster.Spec
 	var empty placement
 	defaults := account.Spec.Defaults
 	if defaults == nil {
-		defaults = &v1alpha1.AccountDefaults{}
+		defaults = &cloudv1.AccountDefaults{}
 	}
 
 	provider := cmp.Or(spec.Provider, defaults.Provider)

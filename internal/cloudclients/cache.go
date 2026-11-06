@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 )
 
@@ -81,7 +81,7 @@ func (e *CredentialMissingError) Error() string { return e.Reason }
 
 // ClientFor returns the account's client, building one if the credential or
 // endpoint has changed since last time.
-func (c *Cache) ClientFor(ctx context.Context, account *v1alpha1.CloudAccount) (cloudapi.Client, error) {
+func (c *Cache) ClientFor(ctx context.Context, account *cloudv1.CloudAccount) (cloudapi.Client, error) {
 	apiKey, err := c.apiKey(ctx, account)
 	if err != nil {
 		return nil, err
@@ -124,7 +124,7 @@ func (c *Cache) ClientFor(ctx context.Context, account *v1alpha1.CloudAccount) (
 // LastFor returns the client last built for the account, whatever has happened
 // to its credential Secret since. Deletion uses it to terminate a cluster whose
 // Secret went in the same kubectl delete.
-func (c *Cache) LastFor(account *v1alpha1.CloudAccount) (cloudapi.Client, bool) {
+func (c *Cache) LastFor(account *cloudv1.CloudAccount) (cloudapi.Client, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	cached, ok := c.entries[types.NamespacedName{Namespace: account.Namespace, Name: account.Name}]
@@ -147,7 +147,7 @@ func (c *Cache) Forget(namespace, name string) {
 	delete(c.entries, types.NamespacedName{Namespace: namespace, Name: name})
 }
 
-func (c *Cache) apiKey(ctx context.Context, account *v1alpha1.CloudAccount) (string, error) {
+func (c *Cache) apiKey(ctx context.Context, account *cloudv1.CloudAccount) (string, error) {
 	secretName := account.Spec.APIKeySecretRef.Name
 	if secretName == "" {
 		return "", &CredentialMissingError{Reason: "spec.apiKeySecretRef.name is empty"}

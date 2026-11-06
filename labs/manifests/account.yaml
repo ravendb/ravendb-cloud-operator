@@ -12,7 +12,7 @@ stringData:
   # create in the RavenDB Cloud portal under Account -> API Keys.
   apiKey: lab-api-key
 ---
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata:
   name: ravendb-cloud

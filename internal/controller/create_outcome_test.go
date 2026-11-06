@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudclients"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudsim"
 )
@@ -67,14 +67,14 @@ func TestACreateWhoseAnswerIsLostIsFoundRatherThanRefused(t *testing.T) {
 	if cluster.Status.ProductID == "" || cluster.Status.Adopted {
 		t.Errorf("productID %q, adopted %v; want the landed cluster, bound as created", cluster.Status.ProductID, cluster.Status.Adopted)
 	}
-	if got := conditionReason(cluster.Status.Conditions, v1alpha1.ConditionReady); got == v1alpha1.ReasonRefused {
+	if got := conditionReason(cluster.Status.Conditions, cloudv1.ConditionReady); got == cloudv1.ReasonRefused {
 		t.Errorf("Ready = %s for a create that landed", got)
 	}
 }
 
 func TestARefusedCreateLeavesNoClaimOnTheName(t *testing.T) {
-	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.DeletionPolicy = v1alpha1.DeletionTerminate
+	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *cloudv1.CloudCluster) {
+		c.Spec.DeletionPolicy = cloudv1.DeletionTerminate
 	}))
 	h.cloud.FailNext("CreateCluster", http.StatusBadRequest)
 	h.reconcileCluster("orders")
@@ -105,9 +105,9 @@ func TestDeletingNeverTerminatesAClusterAnotherObjectHolds(t *testing.T) {
 
 	// An object whose create may have landed, under the name the holder's
 	// cluster has.
-	copyOf := provisionCluster("copy", func(c *v1alpha1.CloudCluster) {
+	copyOf := provisionCluster("copy", func(c *cloudv1.CloudCluster) {
 		c.Spec.DisplayName = "orders"
-		c.Spec.DeletionPolicy = v1alpha1.DeletionTerminate
+		c.Spec.DeletionPolicy = cloudv1.DeletionTerminate
 		c.Finalizers = []string{clusterFinalizer}
 	})
 	h.k8sCreate(copyOf)

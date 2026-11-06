@@ -4,13 +4,13 @@ Manage RavenDB Cloud clusters as Kubernetes objects. Create a cluster from a
 manifest, or take over one that already exists, and get its URLs and client
 certificate in a Secret your applications mount.
 
-> `v1alpha1`, not released yet. For RavenDB running on your own Kubernetes
+> `v1`, not released yet. For RavenDB running on your own Kubernetes
 > nodes, see [ravendb-operator](https://github.com/ravendb/ravendb-operator).
 
 ## What you write
 
 ```yaml
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata:
   name: ravendb-cloud
@@ -23,7 +23,7 @@ spec:
     region: eu-central-1
     allowedIPs: ["203.0.113.0/24"]
 ---
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: orders-dev

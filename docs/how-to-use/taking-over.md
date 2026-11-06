@@ -41,7 +41,7 @@ running inside the cluster next to the key.
 The smallest manifest is a name and the tier the cluster runs on:
 
 ```yaml
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata: {name: legacy-prod, namespace: apps}
 spec:

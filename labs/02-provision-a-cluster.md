@@ -9,7 +9,7 @@ everything you left out.
 ## Do this
 
 ```yaml
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: lab02-orders           # also the cluster's name in RavenDB Cloud

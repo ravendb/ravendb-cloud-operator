@@ -2,9 +2,10 @@
 
 > **See it run:** [Lab 04](../../labs/04-take-over-an-existing-cluster.md) runs the export this relies on.
 
-`v1alpha1` can still change in ways old manifests do not survive, and when it
-does there will be no conversion webhook. None is needed: a CloudCluster finds
-its cluster by name, so moving to a new version is deleting the old objects and
+`v1` is stable: within it, fields are only added, and none changes meaning or
+goes away. A change old manifests would not survive comes as a new API version,
+and without a conversion webhook. None is needed: a CloudCluster finds its
+cluster by name, so moving to a new version is deleting the old objects and
 applying new ones, and nothing in RavenDB Cloud changes.
 
 1. Set `deletionPolicy: Retain` on every object that says `Terminate`.

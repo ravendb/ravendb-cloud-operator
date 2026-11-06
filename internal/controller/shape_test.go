@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 )
 
@@ -27,49 +27,49 @@ func instanceTypes() []cloudapi.InstanceType {
 func TestValidateStorageIOPS(t *testing.T) {
 	cases := []struct {
 		name    string
-		storage v1alpha1.StorageSpec
+		storage cloudv1.StorageSpec
 		wantErr string
 	}{
 		{
 			name:    "a class you may not tune, left alone",
-			storage: v1alpha1.StorageSpec{SizeGB: 50, Type: v1alpha1.StorageSsdStandard},
+			storage: cloudv1.StorageSpec{SizeGB: 50, Type: cloudv1.StorageSsdStandard},
 		},
 		{
 			name:    "a class you may not tune, tuned anyway",
-			storage: v1alpha1.StorageSpec{SizeGB: 50, Type: v1alpha1.StorageSsdStandard, IOPS: iops(3000)},
+			storage: cloudv1.StorageSpec{SizeGB: 50, Type: cloudv1.StorageSsdStandard, IOPS: iops(3000)},
 			wantErr: "cannot be set for SsdStandard",
 		},
 		{
 			// The defect this stage exists for: RavenDB Cloud refuses a create
 			// that leaves iops unset on a class whose range it publishes.
 			name:    "a class you must tune, untuned",
-			storage: v1alpha1.StorageSpec{SizeGB: 50, Type: v1alpha1.StorageSsdPremium},
+			storage: cloudv1.StorageSpec{SizeGB: 50, Type: cloudv1.StorageSsdPremium},
 			wantErr: "is required for SsdPremium",
 		},
 		{
 			name:    "a class you must tune, tuned",
-			storage: v1alpha1.StorageSpec{SizeGB: 50, Type: v1alpha1.StorageSsdPremium, IOPS: iops(4000)},
+			storage: cloudv1.StorageSpec{SizeGB: 50, Type: cloudv1.StorageSsdPremium, IOPS: iops(4000)},
 		},
 		{
 			name:    "below the range",
-			storage: v1alpha1.StorageSpec{SizeGB: 50, Type: v1alpha1.StorageSsdPremium, IOPS: iops(100)},
+			storage: cloudv1.StorageSpec{SizeGB: 50, Type: cloudv1.StorageSsdPremium, IOPS: iops(100)},
 			wantErr: "accepts 500 to 16000",
 		},
 		{
 			name:    "above the range",
-			storage: v1alpha1.StorageSpec{SizeGB: 50, Type: v1alpha1.StorageSsdPremium, IOPS: iops(99000)},
+			storage: cloudv1.StorageSpec{SizeGB: 50, Type: cloudv1.StorageSsdPremium, IOPS: iops(99000)},
 			wantErr: "accepts 500 to 16000",
 		},
 		{
 			// An unset type is SsdStandard, so a minimal manifest needs no iops.
 			name:    "type unset falls back to the default class",
-			storage: v1alpha1.StorageSpec{SizeGB: 50},
+			storage: cloudv1.StorageSpec{SizeGB: 50},
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateStorage(instanceTypes(), "PB10", tc.storage, v1alpha1.ProviderAWS)
+			err := validateStorage(instanceTypes(), "PB10", tc.storage, cloudv1.ProviderAWS)
 			switch {
 			case tc.wantErr == "" && err != nil:
 				t.Fatalf("unexpected error: %v", err)
@@ -85,11 +85,11 @@ func TestValidateStorageIOPS(t *testing.T) {
 // An empty list means this deployment reported nothing, not that nothing
 // is allowed, so the request passes and the cloud judges it.
 func TestValidateStorageFallsThroughOnAnEmptyList(t *testing.T) {
-	if err := validateStorage(nil, "PB10", v1alpha1.StorageSpec{SizeGB: 7}, v1alpha1.ProviderAWS); err != nil {
+	if err := validateStorage(nil, "PB10", cloudv1.StorageSpec{SizeGB: 7}, cloudv1.ProviderAWS); err != nil {
 		t.Errorf("an unknown shape should not be refused here: %v", err)
 	}
 	shapeWithNoOffers := []cloudapi.InstanceType{{Name: "PB10", Tier: cloudapi.TierProduction}}
-	if err := validateStorage(shapeWithNoOffers, "PB10", v1alpha1.StorageSpec{SizeGB: 7, IOPS: iops(9)}, v1alpha1.ProviderAWS); err != nil {
+	if err := validateStorage(shapeWithNoOffers, "PB10", cloudv1.StorageSpec{SizeGB: 7, IOPS: iops(9)}, cloudv1.ProviderAWS); err != nil {
 		t.Errorf("a shape reporting no disk menu should not be refused here: %v", err)
 	}
 }
@@ -101,9 +101,9 @@ func TestValidateReleaseChannel(t *testing.T) {
 	// The names are versioned in production: "Stable" and "LTS" are not
 	// channels, "Stable72" and "Beta50" are. That is the whole reason this
 	// check exists, so the cases use the real shape.
-	withChannels := &v1alpha1.CloudAccount{
-		Status: v1alpha1.CloudAccountStatus{
-			ReleaseChannels: []v1alpha1.ReleaseChannelStatus{
+	withChannels := &cloudv1.CloudAccount{
+		Status: cloudv1.CloudAccountStatus{
+			ReleaseChannels: []cloudv1.ReleaseChannelStatus{
 				{Name: "Stable72"}, {Name: "Stable62"}, {Name: "Beta50"},
 			},
 		},
@@ -111,7 +111,7 @@ func TestValidateReleaseChannel(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		account  *v1alpha1.CloudAccount
+		account  *cloudv1.CloudAccount
 		channel  string
 		accepted bool
 		mentions string
@@ -123,7 +123,7 @@ func TestValidateReleaseChannel(t *testing.T) {
 			// Same rule as an unknown region: an account whose channels have
 			// not been fetched yet must not block a create on data we lack.
 			name:     "nothing cached yet, so the cloud judges",
-			account:  &v1alpha1.CloudAccount{},
+			account:  &cloudv1.CloudAccount{},
 			channel:  "anything",
 			accepted: true,
 		},

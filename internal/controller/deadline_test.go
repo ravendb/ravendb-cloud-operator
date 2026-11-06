@@ -12,7 +12,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudclients"
 )
 
@@ -40,8 +40,8 @@ func TestAPassOutOfTimeStillSaysWhy(t *testing.T) {
 	}
 
 	cluster := h.getCluster("orders")
-	if got := conditionReason(cluster.Status.Conditions, v1alpha1.ConditionReady); got != v1alpha1.ReasonCloudUnreachable {
-		t.Errorf("Ready = %q, want %s written after the deadline", got, v1alpha1.ReasonCloudUnreachable)
+	if got := conditionReason(cluster.Status.Conditions, cloudv1.ConditionReady); got != cloudv1.ReasonCloudUnreachable {
+		t.Errorf("Ready = %q, want %s written after the deadline", got, cloudv1.ReasonCloudUnreachable)
 	}
 }
 

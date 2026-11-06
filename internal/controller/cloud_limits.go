@@ -5,7 +5,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 )
 
 // Limits RavenDB Cloud enforces but never publishes, copied as constants and
@@ -16,10 +16,10 @@ var (
 	// The largest root disk RavenDB Cloud creates on each provider. The
 	// operator only creates RootOnly products, the layout this limit applies
 	// to.
-	maxRootDiskGB = map[v1alpha1.Provider]int32{
-		v1alpha1.ProviderAWS:   1000,
-		v1alpha1.ProviderAzure: 1024,
-		v1alpha1.ProviderGCP:   1000,
+	maxRootDiskGB = map[cloudv1.Provider]int32{
+		cloudv1.ProviderAWS:   1000,
+		cloudv1.ProviderAzure: 1024,
+		cloudv1.ProviderGCP:   1000,
 	}
 
 	// Instance types RavenDB Cloud sells without additional nodes, so their
@@ -31,14 +31,14 @@ var (
 	// The most allow-list entries RavenDB Cloud takes on each provider. AWS is
 	// lower because each address costs two security group rules against a
 	// quota of 60.
-	maxAllowedIPs = map[v1alpha1.Provider]int{
-		v1alpha1.ProviderAWS:   24,
-		v1alpha1.ProviderAzure: 200,
-		v1alpha1.ProviderGCP:   200,
+	maxAllowedIPs = map[cloudv1.Provider]int{
+		cloudv1.ProviderAWS:   24,
+		cloudv1.ProviderAzure: 200,
+		cloudv1.ProviderGCP:   200,
 	}
 )
 
-func validateRootDiskSize(provider v1alpha1.Provider, sizeGB int32) error {
+func validateRootDiskSize(provider cloudv1.Provider, sizeGB int32) error {
 	max, known := maxRootDiskGB[provider]
 	if !known || sizeGB <= max {
 		return nil
@@ -47,7 +47,7 @@ func validateRootDiskSize(provider v1alpha1.Provider, sizeGB int32) error {
 		sizeGB, max, provider)
 }
 
-func validateAllowedIPCount(provider v1alpha1.Provider, allowedIPs []string) error {
+func validateAllowedIPCount(provider cloudv1.Provider, allowedIPs []string) error {
 	max, known := maxAllowedIPs[provider]
 	if !known || len(allowedIPs) <= max {
 		return nil
@@ -84,7 +84,7 @@ func canonicalCIDRs(entries []string) []string {
 // Azure also refuses overlapping entries. That is not checked here: it needs
 // range arithmetic, and getting it subtly wrong would reject lists the cloud
 // accepts.
-func validateAllowedIPs(provider v1alpha1.Provider, allowedIPs []string) error {
+func validateAllowedIPs(provider cloudv1.Provider, allowedIPs []string) error {
 	if err := validateAllowedIPCount(provider, allowedIPs); err != nil {
 		return err
 	}

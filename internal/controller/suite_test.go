@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudclients"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudsim"
 )
@@ -56,7 +56,7 @@ func testScheme(t *testing.T) *runtime.Scheme {
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
 		t.Fatalf("adding client-go scheme: %v", err)
 	}
-	if err := v1alpha1.AddToScheme(scheme); err != nil {
+	if err := cloudv1.AddToScheme(scheme); err != nil {
 		t.Fatalf("adding operator scheme: %v", err)
 	}
 	return scheme
@@ -129,15 +129,15 @@ func newHarness(t *testing.T, objects ...client.Object) *harness {
 		}).
 		WithScheme(scheme).
 		WithObjects(objects...).
-		WithStatusSubresource(&v1alpha1.CloudCluster{}, &v1alpha1.CloudAccount{}, &v1alpha1.CloudClusterRestart{}).
+		WithStatusSubresource(&cloudv1.CloudCluster{}, &cloudv1.CloudAccount{}, &cloudv1.CloudClusterRestart{}).
 		// The same index SetupWithManager registers, and for the same reason:
 		// without it a lookup through it returns nothing instead of failing, so
 		// a test of the Secret-to-account mapping would pass while proving
 		// nothing.
-		WithIndex(&v1alpha1.CloudAccount{}, secretRefIndex, indexAccountsBySecretRef).
-		WithIndex(&v1alpha1.CloudCluster{}, accountRefIndex, indexClustersByAccountRef).
-		WithIndex(&v1alpha1.CloudClusterRestart{}, clusterRefIndex, indexRestartsByClusterRef).
-		WithIndex(&v1alpha1.CloudCluster{}, productIDIndex, indexClustersByProductID).
+		WithIndex(&cloudv1.CloudAccount{}, secretRefIndex, indexAccountsBySecretRef).
+		WithIndex(&cloudv1.CloudCluster{}, accountRefIndex, indexClustersByAccountRef).
+		WithIndex(&cloudv1.CloudClusterRestart{}, clusterRefIndex, indexRestartsByClusterRef).
+		WithIndex(&cloudv1.CloudCluster{}, productIDIndex, indexClustersByProductID).
 		Build()
 
 	// ProvisionDuration and ChangeDuration are zero, so a created cluster is
@@ -214,7 +214,7 @@ func (h *harness) reconcileCluster(name string) reconcile.Result {
 // asked for. That is what lets a cluster be given a realistic provisioning
 // window and still settle in microseconds: the operator's own RequeueAfter
 // decides how far time moves, so a test never sleeps and never guesses.
-func (h *harness) reconcileClusterUntilSettled(name string, maxPasses int) *v1alpha1.CloudCluster {
+func (h *harness) reconcileClusterUntilSettled(name string, maxPasses int) *cloudv1.CloudCluster {
 	h.t.Helper()
 	var wasRunning bool
 	for i := 0; i < maxPasses; i++ {
@@ -247,9 +247,9 @@ func (h *harness) hasEvent(reason string) bool {
 	}
 }
 
-func (h *harness) getCluster(name string) *v1alpha1.CloudCluster {
+func (h *harness) getCluster(name string) *cloudv1.CloudCluster {
 	h.t.Helper()
-	var cluster v1alpha1.CloudCluster
+	var cluster cloudv1.CloudCluster
 	if err := h.k8s.Get(context.Background(), types.NamespacedName{Namespace: testNamespace, Name: name}, &cluster); err != nil {
 		h.t.Fatalf("getting CloudCluster %s: %v", name, err)
 	}
@@ -276,28 +276,28 @@ func credentialSecret() *corev1.Secret {
 
 // readyAccount is a CloudAccount that has already been verified, with a cached
 // lists, which is the state cluster reconciles expect to find.
-func readyAccount() *v1alpha1.CloudAccount {
-	return &v1alpha1.CloudAccount{
+func readyAccount() *cloudv1.CloudAccount {
+	return &cloudv1.CloudAccount{
 		ObjectMeta: metav1.ObjectMeta{Name: testAccountName, Namespace: testNamespace},
-		Spec: v1alpha1.CloudAccountSpec{
-			APIKeySecretRef: v1alpha1.SecretKeySelector{Name: testSecretName, Key: "apiKey"},
-			Defaults: &v1alpha1.AccountDefaults{
-				Provider:   v1alpha1.ProviderAWS,
+		Spec: cloudv1.CloudAccountSpec{
+			APIKeySecretRef: cloudv1.SecretKeySelector{Name: testSecretName, Key: "apiKey"},
+			Defaults: &cloudv1.AccountDefaults{
+				Provider:   cloudv1.ProviderAWS,
 				Region:     "eu-central-1",
 				AllowedIPs: []string{"0.0.0.0/0"},
 			},
 		},
-		Status: v1alpha1.CloudAccountStatus{
+		Status: cloudv1.CloudAccountStatus{
 			// What the simulator answers, as a verified account would have it.
 			DomainName:            "example.ravendb.cloud",
 			DefaultReleaseChannel: "Stable72",
-			Providers: []v1alpha1.ProviderRegions{
-				{Provider: v1alpha1.ProviderAWS, Regions: []string{"eu-central-1", "us-east-1"}},
+			Providers: []cloudv1.ProviderRegions{
+				{Provider: cloudv1.ProviderAWS, Regions: []string{"eu-central-1", "us-east-1"}},
 			},
 			Conditions: []metav1.Condition{{
-				Type:               v1alpha1.ConditionReady,
+				Type:               cloudv1.ConditionReady,
 				Status:             metav1.ConditionTrue,
-				Reason:             v1alpha1.ReasonVerified,
+				Reason:             cloudv1.ReasonVerified,
 				Message:            "ok",
 				LastTransitionTime: metav1.Now(),
 			}},
@@ -305,20 +305,20 @@ func readyAccount() *v1alpha1.CloudAccount {
 	}
 }
 
-func provisionCluster(name string, mutate ...func(*v1alpha1.CloudCluster)) *v1alpha1.CloudCluster {
-	cluster := &v1alpha1.CloudCluster{
+func provisionCluster(name string, mutate ...func(*cloudv1.CloudCluster)) *cloudv1.CloudCluster {
+	cluster := &cloudv1.CloudCluster{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: testNamespace},
-		Spec: v1alpha1.CloudClusterSpec{
-			AccountRef:   v1alpha1.LocalObjectReference{Name: testAccountName},
-			Tier:         v1alpha1.TierProduction,
+		Spec: cloudv1.CloudClusterSpec{
+			AccountRef:   cloudv1.LocalObjectReference{Name: testAccountName},
+			Tier:         cloudv1.TierProduction,
 			InstanceType: "PB10",
 			// 20 GB is the only size on both PB10's menu {10,20,30,50,75} and
 			// PB20's {20,40,80,100,150}, and tests override the instance type
 			// in both directions. A size valid for only one of them fails the
 			// create rather than the assertion, which is a confusing way to find
 			// out.
-			Storage:    v1alpha1.StorageSpec{SizeGB: 20, Type: v1alpha1.StorageSsdStandard},
-			Networking: v1alpha1.NetworkingSpec{AllowedIPs: []string{"0.0.0.0/0"}},
+			Storage:    cloudv1.StorageSpec{SizeGB: 20, Type: cloudv1.StorageSsdStandard},
+			Networking: cloudv1.NetworkingSpec{AllowedIPs: []string{"0.0.0.0/0"}},
 		},
 	}
 	for _, m := range mutate {
@@ -329,12 +329,12 @@ func provisionCluster(name string, mutate ...func(*v1alpha1.CloudCluster)) *v1al
 
 // takeOverCluster is the smallest manifest that names a cluster already
 // running: a name and the tier it has, which is Production for a seeded one.
-func takeOverCluster(name string, mutate ...func(*v1alpha1.CloudCluster)) *v1alpha1.CloudCluster {
-	cluster := &v1alpha1.CloudCluster{
+func takeOverCluster(name string, mutate ...func(*cloudv1.CloudCluster)) *cloudv1.CloudCluster {
+	cluster := &cloudv1.CloudCluster{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: testNamespace},
-		Spec: v1alpha1.CloudClusterSpec{
-			AccountRef: v1alpha1.LocalObjectReference{Name: testAccountName},
-			Tier:       v1alpha1.TierProduction,
+		Spec: cloudv1.CloudClusterSpec{
+			AccountRef: cloudv1.LocalObjectReference{Name: testAccountName},
+			Tier:       cloudv1.TierProduction,
 		},
 	}
 	for _, m := range mutate {

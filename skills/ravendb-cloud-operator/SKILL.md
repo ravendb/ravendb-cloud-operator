@@ -1,6 +1,6 @@
 ---
 name: ravendb-cloud-operator
-description: Writes and troubleshoots manifests for the RavenDB Cloud Kubernetes operator (CloudAccount, CloudCluster, CloudClusterRestart in cloud.ravendb.net/v1alpha1). Use when someone creates or takes over a RavenDB Cloud cluster from Kubernetes, connects an application through the connection Secret, reads STATUS and CHANGES on these objects, restarts a node, or deletes a cluster safely.
+description: Writes and troubleshoots manifests for the RavenDB Cloud Kubernetes operator (CloudAccount, CloudCluster, CloudClusterRestart in cloud.ravendb.net/v1). Use when someone creates or takes over a RavenDB Cloud cluster from Kubernetes, connects an application through the connection Secret, reads STATUS and CHANGES on these objects, restarts a node, or deletes a cluster safely.
 license: MIT
 ---
 
@@ -32,7 +32,7 @@ unset key
 ```
 
 ```yaml
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata:
   name: ravendb-cloud
@@ -44,7 +44,7 @@ spec:
     region: eu-central-1
     allowedIPs: ["203.0.113.0/24"]   # CIDR; a single address needs /32
 ---
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: orders

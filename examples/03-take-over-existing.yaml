@@ -34,7 +34,7 @@
 # Applying it changes nothing, because nothing differs, and from then on editing
 # it is how the cluster changes. A hand-written manifest with a wrong field and
 # managementPolicy Full would reshape the cluster to match on the first pass.
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: legacy-prod

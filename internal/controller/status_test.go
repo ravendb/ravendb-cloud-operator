@@ -16,7 +16,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 )
 
@@ -33,7 +33,7 @@ func TestReportUnlessServing(t *testing.T) {
 	// Read through the accessor rather than restated: what this pins is which
 	// of the two intervals each status gets, and poll above is far enough from
 	// it that picking the wrong one cannot pass.
-	transitional := (&v1alpha1.CloudCluster{}).EffectiveTransitionalInterval()
+	transitional := (&cloudv1.CloudCluster{}).EffectiveTransitionalInterval()
 
 	for _, tc := range []struct {
 		status  cloudapi.ClusterStatus
@@ -43,22 +43,22 @@ func TestReportUnlessServing(t *testing.T) {
 		requeue time.Duration
 	}{
 		{cloudapi.StatusActive, true, "", "", 0},
-		{cloudapi.StatusCreating, false, v1alpha1.ReasonCreating, metav1.ConditionFalse, transitional},
-		{cloudapi.StatusDeployingChanges, false, v1alpha1.ReasonUpdating, metav1.ConditionFalse, transitional},
+		{cloudapi.StatusCreating, false, cloudv1.ReasonCreating, metav1.ConditionFalse, transitional},
+		{cloudapi.StatusDeployingChanges, false, cloudv1.ReasonUpdating, metav1.ConditionFalse, transitional},
 		// The operator's own terminate takes the deletion path, so a
 		// terminating cluster here is somebody else doing it.
-		{cloudapi.StatusTerminating, false, v1alpha1.ReasonDeletedInCloud, metav1.ConditionFalse, poll},
-		{cloudapi.StatusTerminated, false, v1alpha1.ReasonDeletedInCloud, metav1.ConditionFalse, poll},
-		{cloudapi.StatusAwaitingPayment, false, v1alpha1.ReasonAwaitingPayment, metav1.ConditionFalse, poll},
-		{cloudapi.StatusError, false, v1alpha1.ReasonCreationFailed, metav1.ConditionFalse, poll},
+		{cloudapi.StatusTerminating, false, cloudv1.ReasonDeletedInCloud, metav1.ConditionFalse, poll},
+		{cloudapi.StatusTerminated, false, cloudv1.ReasonDeletedInCloud, metav1.ConditionFalse, poll},
+		{cloudapi.StatusAwaitingPayment, false, cloudv1.ReasonAwaitingPayment, metav1.ConditionFalse, poll},
+		{cloudapi.StatusError, false, cloudv1.ReasonCreationFailed, metav1.ConditionFalse, poll},
 		// Not a status the API documents. It must still land somewhere
 		// describable rather than being read as Active, and Unknown is honest:
 		// the operator cannot tell what it means.
-		{cloudapi.ClusterStatus("SomethingNew"), false, v1alpha1.ReasonUnexpectedResponse, metav1.ConditionUnknown, poll},
+		{cloudapi.ClusterStatus("SomethingNew"), false, cloudv1.ReasonUnexpectedResponse, metav1.ConditionUnknown, poll},
 	} {
 		t.Run(string(tc.status), func(t *testing.T) {
-			cluster := &v1alpha1.CloudCluster{
-				Spec: v1alpha1.CloudClusterSpec{PollIntervalSeconds: new(int32(poll / time.Second))},
+			cluster := &cloudv1.CloudCluster{
+				Spec: cloudv1.CloudClusterSpec{PollIntervalSeconds: new(int32(poll / time.Second))},
 			}
 			r := &CloudClusterReconciler{}
 
@@ -81,7 +81,7 @@ func TestReportUnlessServing(t *testing.T) {
 				t.Errorf("requeueAfter = %s, want %s", result.RequeueAfter, tc.requeue)
 			}
 
-			ready := meta.FindStatusCondition(cluster.Status.Conditions, v1alpha1.ConditionReady)
+			ready := meta.FindStatusCondition(cluster.Status.Conditions, cloudv1.ConditionReady)
 			if ready == nil {
 				t.Fatal("no Ready condition")
 			}
@@ -98,12 +98,12 @@ func TestReportUnlessServing(t *testing.T) {
 // A status this operator does not know has to be named in the message, since
 // its own word for it says nothing more than "unexpected".
 func TestAnUnknownCloudStatusIsNamed(t *testing.T) {
-	cluster := &v1alpha1.CloudCluster{}
+	cluster := &cloudv1.CloudCluster{}
 	r := &CloudClusterReconciler{}
 
 	r.reportUnlessServing(context.Background(), cluster, &cloudapi.Cluster{Status: "SomethingNew"})
 
-	if cond := meta.FindStatusCondition(cluster.Status.Conditions, v1alpha1.ConditionReady); !strings.Contains(cond.Message, "SomethingNew") {
+	if cond := meta.FindStatusCondition(cluster.Status.Conditions, cloudv1.ConditionReady); !strings.Contains(cond.Message, "SomethingNew") {
 		t.Errorf("message %q does not name the cloud status", cond.Message)
 	}
 }
@@ -111,8 +111,8 @@ func TestAnUnknownCloudStatusIsNamed(t *testing.T) {
 // A short spec.pollInterval is a request to be told sooner, and it wins over
 // the transitional default rather than being floored by it.
 func TestReportUnlessServingHonoursAShortPollInterval(t *testing.T) {
-	cluster := &v1alpha1.CloudCluster{
-		Spec: v1alpha1.CloudClusterSpec{PollIntervalSeconds: new(int32(2))},
+	cluster := &cloudv1.CloudCluster{
+		Spec: cloudv1.CloudClusterSpec{PollIntervalSeconds: new(int32(2))},
 	}
 	r := &CloudClusterReconciler{}
 

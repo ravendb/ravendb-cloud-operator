@@ -9,7 +9,7 @@ Every rule has one home. Find it by asking what the rule needs to look at:
 
 | The rule needs | Home | The user finds out |
 |---|---|---|
-| only the object being applied | `api/v1alpha1/` | at `kubectl apply`, before anything is stored |
+| only the object being applied | `api/v1/` | at `kubectl apply`, before anything is stored |
 | only the outgoing request | `cloudapi.ValidateCreate` | on the first reconcile, before a request goes out |
 | which regions, instance types and disk shapes exist, or a limit RavenDB Cloud does not publish | `internal/controller` | on the first reconcile, told which spec field to change |
 | the account, the bill, or objects we cannot see | nowhere: RavenDB Cloud refuses it | after a round trip, in the cloud's own words |
@@ -17,7 +17,7 @@ Every rule has one home. Find it by asking what the rule needs to look at:
 Put a rule in the first row it fits: earlier is sooner for the user, cheaper in
 calls, and the message is ours to write.
 
-**`api/v1alpha1`.** `+kubebuilder:validation` markers and CEL rules: enums,
+**`api/v1`.** `+kubebuilder:validation` markers and CEL rules: enums,
 bounds, formats, required-together, mutually exclusive, immutability. The only
 home that rejects a manifest before it is stored and shows in `kubectl explain`.
 CEL transition rules (`oldSelf`) do not fire on create, so a rule that must also
@@ -62,7 +62,7 @@ cluster with a long name.
 
 | Kind | Home |
 |---|---|
-| static | `+kubebuilder:default` in `api/v1alpha1`; if the API server can apply it, nothing else may |
+| static | `+kubebuilder:default` in `api/v1`; if the API server can apply it, nothing else may |
 | dynamic, needing what RavenDB Cloud offers or the account | `internal/controller`: smallest instance type for a tier (`smallestForTier`), smallest disk the instance type sells (`smallestDiskFor`), subdomain from the display name, `CloudAccount.spec.defaults`, and for the release channel then the account default RavenDB Cloud reports (`status.defaultReleaseChannel`) |
 | reading a defaulted field | the `Effective*` method on the type, the single read path; where it backstops a static default, a test pins the two to the same value |
 

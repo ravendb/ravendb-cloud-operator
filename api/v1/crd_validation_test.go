@@ -1,4 +1,4 @@
-package v1alpha1_test
+package v1_test
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 )
 
 // These tests install the generated CRDs into a real kube-apiserver and check
@@ -67,7 +67,7 @@ func TestMain(m *testing.M) {
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
 		panic(err)
 	}
-	if err := v1alpha1.AddToScheme(scheme); err != nil {
+	if err := cloudv1.AddToScheme(scheme); err != nil {
 		panic(err)
 	}
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
@@ -117,16 +117,16 @@ func newNamespace(t *testing.T) string {
 	return name
 }
 
-func baseCluster(namespace, name string) *v1alpha1.CloudCluster {
-	return &v1alpha1.CloudCluster{
+func baseCluster(namespace, name string) *cloudv1.CloudCluster {
+	return &cloudv1.CloudCluster{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-		Spec: v1alpha1.CloudClusterSpec{
-			AccountRef: v1alpha1.LocalObjectReference{Name: "acct"},
-			Tier:       v1alpha1.TierProduction,
-			Provider:   v1alpha1.ProviderAWS,
+		Spec: cloudv1.CloudClusterSpec{
+			AccountRef: cloudv1.LocalObjectReference{Name: "acct"},
+			Tier:       cloudv1.TierProduction,
+			Provider:   cloudv1.ProviderAWS,
 			Region:     "eu-central-1",
-			Storage:    v1alpha1.StorageSpec{SizeGB: 128},
-			Networking: v1alpha1.NetworkingSpec{AllowedIPs: []string{"0.0.0.0/0"}},
+			Storage:    cloudv1.StorageSpec{SizeGB: 128},
+			Networking: cloudv1.NetworkingSpec{AllowedIPs: []string{"0.0.0.0/0"}},
 		},
 	}
 }
@@ -134,7 +134,7 @@ func baseCluster(namespace, name string) *v1alpha1.CloudCluster {
 // holdCluster records in status that the object has found its cluster, which
 // is when its identity fields stop being editable. Status goes through its own
 // subresource, as the operator writes it.
-func holdCluster(t *testing.T, cluster *v1alpha1.CloudCluster) {
+func holdCluster(t *testing.T, cluster *cloudv1.CloudCluster) {
 	t.Helper()
 	cluster.Status.ProductID = "1-A"
 	if err := k8sClient.Status().Update(context.Background(), cluster); err != nil {
@@ -178,7 +178,7 @@ func TestCRDRequiresOnlyAnAccountAndATier(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			cluster := &unstructured.Unstructured{}
-			cluster.SetGroupVersionKind(v1alpha1.GroupVersion.WithKind("CloudCluster"))
+			cluster.SetGroupVersionKind(cloudv1.GroupVersion.WithKind("CloudCluster"))
 			cluster.SetNamespace(newNamespace(t))
 			cluster.SetName("minimal")
 			if err := unstructured.SetNestedMap(cluster.Object, tc.spec, "spec"); err != nil {
@@ -208,19 +208,19 @@ func TestCRDRejectsChangingImmutableFields(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		mutate  func(*v1alpha1.CloudCluster)
+		mutate  func(*cloudv1.CloudCluster)
 		message string
 		// field is where fieldPath on the rule should put the blame. Without
 		// it every one of these reads "spec: Invalid value: object", which
 		// names the whole spec rather than the field to fix.
 		field string
 	}{
-		{"region", func(c *v1alpha1.CloudCluster) { c.Spec.Region = "us-east-1" }, "region cannot change", "spec.region"},
-		{"provider", func(c *v1alpha1.CloudCluster) { c.Spec.Provider = v1alpha1.ProviderGCP }, "provider cannot change", "spec.provider"},
-		{"tier", func(c *v1alpha1.CloudCluster) { c.Spec.Tier = v1alpha1.TierFree }, "tier cannot change", "spec.tier"},
-		{"subdomain", func(c *v1alpha1.CloudCluster) { c.Spec.Subdomain = "elsewhere" }, "subdomain cannot change", "spec.subdomain"},
-		{"displayName", func(c *v1alpha1.CloudCluster) { c.Spec.DisplayName = "somebody-elses" }, "displayName cannot change", "spec.displayName"},
-		{"creationMode", func(c *v1alpha1.CloudCluster) { c.Spec.CreationMode = v1alpha1.CreationCreateOnly }, "creationMode cannot change", "spec.creationMode"},
+		{"region", func(c *cloudv1.CloudCluster) { c.Spec.Region = "us-east-1" }, "region cannot change", "spec.region"},
+		{"provider", func(c *cloudv1.CloudCluster) { c.Spec.Provider = cloudv1.ProviderGCP }, "provider cannot change", "spec.provider"},
+		{"tier", func(c *cloudv1.CloudCluster) { c.Spec.Tier = cloudv1.TierFree }, "tier cannot change", "spec.tier"},
+		{"subdomain", func(c *cloudv1.CloudCluster) { c.Spec.Subdomain = "elsewhere" }, "subdomain cannot change", "spec.subdomain"},
+		{"displayName", func(c *cloudv1.CloudCluster) { c.Spec.DisplayName = "somebody-elses" }, "displayName cannot change", "spec.displayName"},
+		{"creationMode", func(c *cloudv1.CloudCluster) { c.Spec.CreationMode = cloudv1.CreationCreateOnly }, "creationMode cannot change", "spec.creationMode"},
 	}
 
 	for _, tc := range cases {
@@ -266,11 +266,11 @@ func TestCRDRejectsAddingAnOmittedIdentityField(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		mutate  func(*v1alpha1.CloudCluster)
+		mutate  func(*cloudv1.CloudCluster)
 		message string
 	}{
-		{"subdomain", func(c *v1alpha1.CloudCluster) { c.Spec.Subdomain = "sneaky" }, "subdomain cannot change"},
-		{"displayName", func(c *v1alpha1.CloudCluster) { c.Spec.DisplayName = "somebody-elses" }, "displayName cannot change"},
+		{"subdomain", func(c *cloudv1.CloudCluster) { c.Spec.Subdomain = "sneaky" }, "subdomain cannot change"},
+		{"displayName", func(c *cloudv1.CloudCluster) { c.Spec.DisplayName = "somebody-elses" }, "displayName cannot change"},
 	}
 
 	for _, tc := range cases {
@@ -307,11 +307,11 @@ func TestCRDRejectsRemovingAnIdentityField(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		remove  func(*v1alpha1.CloudCluster)
+		remove  func(*cloudv1.CloudCluster)
 		message string
 	}{
-		{"subdomain", func(c *v1alpha1.CloudCluster) { c.Spec.Subdomain = "" }, "subdomain cannot change"},
-		{"displayName", func(c *v1alpha1.CloudCluster) { c.Spec.DisplayName = "" }, "displayName cannot change"},
+		{"subdomain", func(c *cloudv1.CloudCluster) { c.Spec.Subdomain = "" }, "subdomain cannot change"},
+		{"displayName", func(c *cloudv1.CloudCluster) { c.Spec.DisplayName = "" }, "displayName cannot change"},
 	}
 
 	for _, tc := range cases {
@@ -337,7 +337,7 @@ func TestCRDRejectsRemovingAnIdentityField(t *testing.T) {
 	}
 }
 
-func clusterField(c *v1alpha1.CloudCluster, name string) string {
+func clusterField(c *cloudv1.CloudCluster, name string) string {
 	switch name {
 	case "subdomain":
 		return c.Spec.Subdomain
@@ -366,7 +366,7 @@ func TestCRDAllowsPinningAnInheritedProviderAndRegion(t *testing.T) {
 	}
 	holdCluster(t, cluster)
 
-	cluster.Spec.Provider = v1alpha1.ProviderAWS
+	cluster.Spec.Provider = cloudv1.ProviderAWS
 	cluster.Spec.Region = "eu-central-1"
 	if err := k8sClient.Update(ctx, cluster); err != nil {
 		t.Fatalf("the API server refused writing down an inherited provider and region: %v", err)
@@ -442,7 +442,7 @@ func TestCRDAppliesDefaults(t *testing.T) {
 
 	// deletionPolicy defaulting to Retain is the safety property that matters
 	// most: a stray kubectl delete must not destroy a database.
-	if cluster.Spec.DeletionPolicy != v1alpha1.DeletionRetain {
+	if cluster.Spec.DeletionPolicy != cloudv1.DeletionRetain {
 		t.Errorf("deletionPolicy defaulted to %q, want Retain", cluster.Spec.DeletionPolicy)
 	}
 	// storage.type is deliberately not defaulted here; the correct value
@@ -473,7 +473,7 @@ func TestCRDRequiresAtLeastOneAllowedIPWhenSpecified(t *testing.T) {
 	// reaches the server; what matters is what happens to a user who literally
 	// writes "allowedIPs: []" in YAML.
 	cluster := &unstructured.Unstructured{}
-	cluster.SetGroupVersionKind(v1alpha1.GroupVersion.WithKind("CloudCluster"))
+	cluster.SetGroupVersionKind(cloudv1.GroupVersion.WithKind("CloudCluster"))
 	cluster.SetNamespace(ns)
 	cluster.SetName("empty-ips")
 	if err := unstructured.SetNestedMap(cluster.Object, map[string]any{
@@ -500,10 +500,10 @@ func TestCloudAccountCRDInstalls(t *testing.T) {
 	requireEnvtest(t)
 	ns := newNamespace(t)
 
-	account := &v1alpha1.CloudAccount{
+	account := &cloudv1.CloudAccount{
 		ObjectMeta: metav1.ObjectMeta{Name: "acct", Namespace: ns},
-		Spec: v1alpha1.CloudAccountSpec{
-			APIKeySecretRef: v1alpha1.SecretKeySelector{Name: "key"},
+		Spec: cloudv1.CloudAccountSpec{
+			APIKeySecretRef: cloudv1.SecretKeySelector{Name: "key"},
 		},
 	}
 	if err := k8sClient.Create(context.Background(), account); err != nil {
@@ -538,23 +538,23 @@ func TestCRDDefaultsAgreeWithAccessors(t *testing.T) {
 	ns := newNamespace(t)
 	ctx := context.Background()
 
-	account := &v1alpha1.CloudAccount{
+	account := &cloudv1.CloudAccount{
 		ObjectMeta: metav1.ObjectMeta{Name: "defaults", Namespace: ns},
-		Spec: v1alpha1.CloudAccountSpec{
-			APIKeySecretRef: v1alpha1.SecretKeySelector{Name: "key"},
+		Spec: cloudv1.CloudAccountSpec{
+			APIKeySecretRef: cloudv1.SecretKeySelector{Name: "key"},
 		},
 	}
 	if err := k8sClient.Create(ctx, account); err != nil {
 		t.Fatalf("creating CloudAccount: %v", err)
 	}
 
-	cluster := &v1alpha1.CloudCluster{
+	cluster := &cloudv1.CloudCluster{
 		ObjectMeta: metav1.ObjectMeta{Name: "defaults", Namespace: ns},
-		Spec: v1alpha1.CloudClusterSpec{
-			AccountRef: v1alpha1.LocalObjectReference{Name: "defaults"},
-			Tier:       v1alpha1.TierDevelopment,
-			Storage:    v1alpha1.StorageSpec{SizeGB: 32},
-			Networking: v1alpha1.NetworkingSpec{AllowedIPs: []string{"0.0.0.0/0"}},
+		Spec: cloudv1.CloudClusterSpec{
+			AccountRef: cloudv1.LocalObjectReference{Name: "defaults"},
+			Tier:       cloudv1.TierDevelopment,
+			Storage:    cloudv1.StorageSpec{SizeGB: 32},
+			Networking: cloudv1.NetworkingSpec{AllowedIPs: []string{"0.0.0.0/0"}},
 		},
 	}
 	if err := k8sClient.Create(ctx, cluster); err != nil {
@@ -564,9 +564,9 @@ func TestCRDDefaultsAgreeWithAccessors(t *testing.T) {
 	// An empty object, so each accessor has to fall back rather than read a
 	// value the API server wrote.
 	var (
-		zeroAccount v1alpha1.CloudAccount
-		zeroCluster v1alpha1.CloudCluster
-		zeroStorage v1alpha1.StorageSpec
+		zeroAccount cloudv1.CloudAccount
+		zeroCluster cloudv1.CloudCluster
+		zeroStorage cloudv1.StorageSpec
 	)
 
 	if got, want := account.Spec.APIKeySecretRef.Key, zeroAccount.EffectiveSecretKey(); got != want {
@@ -598,10 +598,10 @@ func TestCRDDefaultsAgreeWithAccessors(t *testing.T) {
 		t.Errorf("storage.type was defaulted to %q; it must stay unset so the "+
 			"operator can pick per provider", got)
 	}
-	if got := zeroStorage.EffectiveStorageType(v1alpha1.ProviderGCP); got != v1alpha1.StorageSsdPremium {
+	if got := zeroStorage.EffectiveStorageType(cloudv1.ProviderGCP); got != cloudv1.StorageSsdPremium {
 		t.Errorf("unset storage.type on GCP = %q, want SsdPremium", got)
 	}
-	if got := zeroStorage.EffectiveStorageType(v1alpha1.ProviderAWS); got != v1alpha1.StorageSsdStandard {
+	if got := zeroStorage.EffectiveStorageType(cloudv1.ProviderAWS); got != cloudv1.StorageSsdStandard {
 		t.Errorf("unset storage.type on AWS = %q, want SsdStandard", got)
 	}
 
@@ -624,14 +624,14 @@ func TestCRDDefaultsAgreeWithAccessors(t *testing.T) {
 
 	// Present but empty is the case where the field defaults do fire, so this is
 	// where they can be compared against the accessors.
-	withBlock := &v1alpha1.CloudCluster{
+	withBlock := &cloudv1.CloudCluster{
 		ObjectMeta: metav1.ObjectMeta{Name: "defaults-secret", Namespace: ns},
-		Spec: v1alpha1.CloudClusterSpec{
-			AccountRef:       v1alpha1.LocalObjectReference{Name: "defaults"},
-			ConnectionSecret: &v1alpha1.ConnectionSecretSpec{},
-			Tier:             v1alpha1.TierDevelopment,
-			Storage:          v1alpha1.StorageSpec{SizeGB: 32},
-			Networking:       v1alpha1.NetworkingSpec{AllowedIPs: []string{"0.0.0.0/0"}},
+		Spec: cloudv1.CloudClusterSpec{
+			AccountRef:       cloudv1.LocalObjectReference{Name: "defaults"},
+			ConnectionSecret: &cloudv1.ConnectionSecretSpec{},
+			Tier:             cloudv1.TierDevelopment,
+			Storage:          cloudv1.StorageSpec{SizeGB: 32},
+			Networking:       cloudv1.NetworkingSpec{AllowedIPs: []string{"0.0.0.0/0"}},
 		},
 	}
 	if err := k8sClient.Create(ctx, withBlock); err != nil {
@@ -679,12 +679,12 @@ func TestCRDAcceptsTheChangesThatOnlyConfirm(t *testing.T) {
 	holdCluster(t, cluster)
 
 	cluster.Spec.DisplayName = "Legacy-Prod"
-	cluster.Spec.CreationMode = v1alpha1.CreationTakeOverOnly
+	cluster.Spec.CreationMode = cloudv1.CreationTakeOverOnly
 	if err := k8sClient.Update(ctx, cluster); err != nil {
 		t.Errorf("writing down the name and confirming the takeover was refused: %v", err)
 	}
 
-	cluster.Spec.CreationMode = v1alpha1.CreationTakeOverOrCreate
+	cluster.Spec.CreationMode = cloudv1.CreationTakeOverOrCreate
 	if err := k8sClient.Update(ctx, cluster); err == nil || !strings.Contains(err.Error(), "creationMode cannot change") {
 		t.Errorf("going back to TakeOverOrCreate gave %v; want it refused", err)
 	}
@@ -697,13 +697,13 @@ func TestCRDAllowsConfirmingACreateOnlyCluster(t *testing.T) {
 	requireEnvtest(t)
 	ctx := context.Background()
 	cluster := baseCluster(newNamespace(t), "restored")
-	cluster.Spec.CreationMode = v1alpha1.CreationCreateOnly
+	cluster.Spec.CreationMode = cloudv1.CreationCreateOnly
 	if err := k8sClient.Create(ctx, cluster); err != nil {
 		t.Fatalf("creating: %v", err)
 	}
 	holdCluster(t, cluster)
 
-	cluster.Spec.CreationMode = v1alpha1.CreationTakeOverOnly
+	cluster.Spec.CreationMode = cloudv1.CreationTakeOverOnly
 	if err := k8sClient.Update(ctx, cluster); err != nil {
 		t.Errorf("moving CreateOnly to TakeOverOnly was refused: %v", err)
 	}
@@ -722,13 +722,13 @@ func TestCRDAllowsFixingIdentityBeforeTheClusterExists(t *testing.T) {
 	}
 
 	cluster.Spec.AccountRef.Name = "the-right-account"
-	cluster.Spec.Tier = v1alpha1.TierDevelopment
-	cluster.Spec.Provider = v1alpha1.ProviderAzure
+	cluster.Spec.Tier = cloudv1.TierDevelopment
+	cluster.Spec.Provider = cloudv1.ProviderAzure
 	cluster.Spec.Region = "westeurope"
 	cluster.Spec.Subdomain = "typo-fixed"
 	cluster.Spec.DisplayName = "Typo Fixed"
-	cluster.Spec.CreationMode = v1alpha1.CreationCreateOnly
-	cluster.Spec.Storage = v1alpha1.StorageSpec{}
+	cluster.Spec.CreationMode = cloudv1.CreationCreateOnly
+	cluster.Spec.Storage = cloudv1.StorageSpec{}
 	if err := k8sClient.Update(ctx, cluster); err != nil {
 		t.Fatalf("editing the identity of an object with no cluster yet was refused: %v", err)
 	}
@@ -738,7 +738,7 @@ func TestCRDAllowsFixingIdentityBeforeTheClusterExists(t *testing.T) {
 	if err := k8sClient.Status().Update(ctx, cluster); err != nil {
 		t.Fatalf("recording the create in status: %v", err)
 	}
-	cluster.Spec.Tier = v1alpha1.TierProduction
+	cluster.Spec.Tier = cloudv1.TierProduction
 	if err := k8sClient.Update(ctx, cluster); err == nil || !strings.Contains(err.Error(), "tier cannot change") {
 		t.Errorf("changing the tier after a create went out gave %v; want it refused", err)
 	}
@@ -750,8 +750,8 @@ func TestCRDRefusesCreateOnlyUnderObserve(t *testing.T) {
 	requireEnvtest(t)
 	ns := newNamespace(t)
 	cluster := baseCluster(ns, "create-only")
-	cluster.Spec.CreationMode = v1alpha1.CreationCreateOnly
-	cluster.Spec.ManagementPolicy = v1alpha1.ManagementObserve
+	cluster.Spec.CreationMode = cloudv1.CreationCreateOnly
+	cluster.Spec.ManagementPolicy = cloudv1.ManagementObserve
 
 	err := k8sClient.Create(context.Background(), cluster)
 	if err == nil {
@@ -772,11 +772,11 @@ func TestCRDTiesTerminateAndFullToAnExplicitCreationMode(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		mutate  func(*v1alpha1.CloudCluster)
+		mutate  func(*cloudv1.CloudCluster)
 		refused string
 	}{
-		{"terminate", func(c *v1alpha1.CloudCluster) { c.Spec.DeletionPolicy = v1alpha1.DeletionTerminate }, "spec.deletionPolicy"},
-		{"full", func(c *v1alpha1.CloudCluster) { c.Spec.ManagementPolicy = v1alpha1.ManagementFull }, "spec.managementPolicy"},
+		{"terminate", func(c *cloudv1.CloudCluster) { c.Spec.DeletionPolicy = cloudv1.DeletionTerminate }, "spec.deletionPolicy"},
+		{"full", func(c *cloudv1.CloudCluster) { c.Spec.ManagementPolicy = cloudv1.ManagementFull }, "spec.managementPolicy"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name+"-default", func(t *testing.T) {
@@ -790,7 +790,7 @@ func TestCRDTiesTerminateAndFullToAnExplicitCreationMode(t *testing.T) {
 				t.Errorf("message %q does not blame %s or say what to set", err.Error(), tc.refused)
 			}
 		})
-		for _, mode := range []v1alpha1.CreationMode{v1alpha1.CreationCreateOnly, v1alpha1.CreationTakeOverOnly} {
+		for _, mode := range []cloudv1.CreationMode{cloudv1.CreationCreateOnly, cloudv1.CreationTakeOverOnly} {
 			t.Run(tc.name+"-"+strings.ToLower(string(mode)), func(t *testing.T) {
 				cluster := baseCluster(ns, tc.name+"-"+strings.ToLower(string(mode)))
 				cluster.Spec.CreationMode = mode
@@ -814,18 +814,18 @@ func TestCRDEnforcesTheNodeCeiling(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		tier     v1alpha1.Tier
+		tier     cloudv1.Tier
 		nodes    int32
 		accepted bool
 		message  string
 	}{
-		{"three on production is the base size", v1alpha1.TierProduction, 3, true, ""},
-		{"six on production is the ceiling", v1alpha1.TierProduction, 6, true, ""},
-		{"seven exceeds the ceiling", v1alpha1.TierProduction, 7, false, "should be less than or equal to 6"},
-		{"two on production would drop a standard node", v1alpha1.TierProduction, 2, false, "standard nodes"},
-		{"one on development is fine", v1alpha1.TierDevelopment, 1, true, ""},
-		{"two on development needs additional nodes", v1alpha1.TierDevelopment, 2, false, "exactly one node"},
-		{"four on free needs additional nodes too", v1alpha1.TierFree, 4, false, "exactly one node"},
+		{"three on production is the base size", cloudv1.TierProduction, 3, true, ""},
+		{"six on production is the ceiling", cloudv1.TierProduction, 6, true, ""},
+		{"seven exceeds the ceiling", cloudv1.TierProduction, 7, false, "should be less than or equal to 6"},
+		{"two on production would drop a standard node", cloudv1.TierProduction, 2, false, "standard nodes"},
+		{"one on development is fine", cloudv1.TierDevelopment, 1, true, ""},
+		{"two on development needs additional nodes", cloudv1.TierDevelopment, 2, false, "exactly one node"},
+		{"four on free needs additional nodes too", cloudv1.TierFree, 4, false, "exactly one node"},
 	}
 
 	for _, tc := range cases {
@@ -919,7 +919,7 @@ func TestCRDRefusesServerless(t *testing.T) {
 	// Unstructured, because the Go constant is gone: the point is that the API
 	// server refuses the string, not that our types cannot express it.
 	cluster := map[string]any{
-		"apiVersion": "cloud.ravendb.net/v1alpha1",
+		"apiVersion": "cloud.ravendb.net/v1",
 		"kind":       "CloudCluster",
 		"metadata":   map[string]any{"name": "serverless", "namespace": ns},
 		"spec": map[string]any{
@@ -970,7 +970,7 @@ func TestCRDRequiresAUsableSecretName(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := newNamespace(t)
 			cluster := baseCluster(ns, "secretname")
-			cluster.Spec.ConnectionSecret = &v1alpha1.ConnectionSecretSpec{Name: tc.secret}
+			cluster.Spec.ConnectionSecret = &cloudv1.ConnectionSecretSpec{Name: tc.secret}
 
 			err := k8sClient.Create(ctx, cluster)
 			if tc.accepted && err != nil {
@@ -992,15 +992,15 @@ func TestCRDRefusesStandardDiskOnGCP(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		provider v1alpha1.Provider
-		disk     v1alpha1.StorageType
+		provider cloudv1.Provider
+		disk     cloudv1.StorageType
 		accepted bool
 	}{
-		{"GCP with the class it does not sell", v1alpha1.ProviderGCP, v1alpha1.StorageSsdStandard, false},
-		{"GCP with premium", v1alpha1.ProviderGCP, v1alpha1.StorageSsdPremium, true},
-		{"GCP with nothing named, so the operator picks", v1alpha1.ProviderGCP, "", true},
-		{"AWS with standard", v1alpha1.ProviderAWS, v1alpha1.StorageSsdStandard, true},
-		{"Azure with standard", v1alpha1.ProviderAzure, v1alpha1.StorageSsdStandard, true},
+		{"GCP with the class it does not sell", cloudv1.ProviderGCP, cloudv1.StorageSsdStandard, false},
+		{"GCP with premium", cloudv1.ProviderGCP, cloudv1.StorageSsdPremium, true},
+		{"GCP with nothing named, so the operator picks", cloudv1.ProviderGCP, "", true},
+		{"AWS with standard", cloudv1.ProviderAWS, cloudv1.StorageSsdStandard, true},
+		{"Azure with standard", cloudv1.ProviderAzure, cloudv1.StorageSsdStandard, true},
 	}
 
 	for _, tc := range cases {
@@ -1041,12 +1041,12 @@ func TestCRDAcceptsTheSmallestUsefulManifest(t *testing.T) {
 	requireEnvtest(t)
 	ns := newNamespace(t)
 
-	cluster := &v1alpha1.CloudCluster{
+	cluster := &cloudv1.CloudCluster{
 		ObjectMeta: metav1.ObjectMeta{Name: "minimal", Namespace: ns},
-		Spec: v1alpha1.CloudClusterSpec{
-			AccountRef: v1alpha1.LocalObjectReference{Name: "acct"},
-			Tier:       v1alpha1.TierDevelopment,
-			Networking: v1alpha1.NetworkingSpec{AllowedIPs: []string{"0.0.0.0/0"}},
+		Spec: cloudv1.CloudClusterSpec{
+			AccountRef: cloudv1.LocalObjectReference{Name: "acct"},
+			Tier:       cloudv1.TierDevelopment,
+			Networking: cloudv1.NetworkingSpec{AllowedIPs: []string{"0.0.0.0/0"}},
 		},
 	}
 	if err := k8sClient.Create(context.Background(), cluster); err != nil {
@@ -1087,11 +1087,11 @@ func TestCRDRefusesDuplicateAllowedIPsOnBothLists(t *testing.T) {
 	})
 
 	t.Run("CloudAccount spec.defaults.allowedIPs", func(t *testing.T) {
-		account := &v1alpha1.CloudAccount{
+		account := &cloudv1.CloudAccount{
 			ObjectMeta: metav1.ObjectMeta{Name: "dupes", Namespace: newNamespace(t)},
-			Spec: v1alpha1.CloudAccountSpec{
-				APIKeySecretRef: v1alpha1.SecretKeySelector{Name: "api-key"},
-				Defaults:        &v1alpha1.AccountDefaults{AllowedIPs: dupes},
+			Spec: cloudv1.CloudAccountSpec{
+				APIKeySecretRef: cloudv1.SecretKeySelector{Name: "api-key"},
+				Defaults:        &cloudv1.AccountDefaults{AllowedIPs: dupes},
 			},
 		}
 		if err := k8sClient.Create(ctx, account); err == nil {
@@ -1110,17 +1110,17 @@ func TestCRDRejectsEditingARestart(t *testing.T) {
 
 	for _, tc := range []struct {
 		name   string
-		mutate func(*v1alpha1.CloudClusterRestart)
+		mutate func(*cloudv1.CloudClusterRestart)
 	}{
-		{"nodeTag", func(r *v1alpha1.CloudClusterRestart) { r.Spec.NodeTag = "B" }},
-		{"clusterRef", func(r *v1alpha1.CloudClusterRestart) { r.Spec.ClusterRef.Name = "elsewhere" }},
+		{"nodeTag", func(r *cloudv1.CloudClusterRestart) { r.Spec.NodeTag = "B" }},
+		{"clusterRef", func(r *cloudv1.CloudClusterRestart) { r.Spec.ClusterRef.Name = "elsewhere" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ns := newNamespace(t)
-			restart := &v1alpha1.CloudClusterRestart{
+			restart := &cloudv1.CloudClusterRestart{
 				ObjectMeta: metav1.ObjectMeta{Name: "restart", Namespace: ns},
-				Spec: v1alpha1.CloudClusterRestartSpec{
-					ClusterRef: v1alpha1.LocalObjectReference{Name: "orders"},
+				Spec: cloudv1.CloudClusterRestartSpec{
+					ClusterRef: cloudv1.LocalObjectReference{Name: "orders"},
 					NodeTag:    "A",
 				},
 			}
@@ -1159,10 +1159,10 @@ func TestCRDChecksTheRestartNodeTagShape(t *testing.T) {
 	} {
 		t.Run("tag "+tc.tag, func(t *testing.T) {
 			ns := newNamespace(t)
-			err := k8sClient.Create(ctx, &v1alpha1.CloudClusterRestart{
+			err := k8sClient.Create(ctx, &cloudv1.CloudClusterRestart{
 				ObjectMeta: metav1.ObjectMeta{Name: "restart", Namespace: ns},
-				Spec: v1alpha1.CloudClusterRestartSpec{
-					ClusterRef: v1alpha1.LocalObjectReference{Name: "orders"},
+				Spec: cloudv1.CloudClusterRestartSpec{
+					ClusterRef: cloudv1.LocalObjectReference{Name: "orders"},
 					NodeTag:    tc.tag,
 				},
 			})

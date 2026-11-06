@@ -86,7 +86,7 @@ helm upgrade ravendb-cloud-operator ravendb-cloud-operator/ravendb-cloud-operato
 
 With `install.yaml`, apply the new release's file the same way you applied the first.
 
-A new API version, rather than a new release of `v1alpha1`, is a different
+A new API version, rather than a new release of `v1`, is a different
 procedure: [upgrading.md](upgrading.md).
 
 ## While the operator is not running

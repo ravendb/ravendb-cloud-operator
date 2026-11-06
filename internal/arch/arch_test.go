@@ -37,7 +37,7 @@ type rule struct {
 var rules = []rule{
 	{
 		from:      "internal/cloudapi",
-		to:        module + "/api/v1alpha1",
+		to:        module + "/api/v1",
 		bindTests: true,
 		why: "internal/cloudapi knows only the request it is given. A rule needing the\n" +
 			"region or instance-type lists, or an error message in CRD vocabulary, belongs\n" +

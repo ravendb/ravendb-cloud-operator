@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudclients"
 	"github.com/ravendb/ravendb-cloud-operator/internal/export"
@@ -136,7 +136,7 @@ func cloudFor(
 	// The manifests name the account in spec.accountRef, which only reaches
 	// their own namespace, so they go where the account is.
 	namespace = cmp.Or(namespace, current)
-	var found v1alpha1.CloudAccount
+	var found cloudv1.CloudAccount
 	err = kube.Get(ctx, types.NamespacedName{Namespace: namespace, Name: account}, &found)
 	switch {
 	case apierrors.IsNotFound(err):
@@ -173,7 +173,7 @@ func connectWithKubeconfig() (client.Client, string, error) {
 	if err := corev1.AddToScheme(scheme); err != nil {
 		return nil, "", err
 	}
-	if err := v1alpha1.AddToScheme(scheme); err != nil {
+	if err := cloudv1.AddToScheme(scheme); err != nil {
 		return nil, "", err
 	}
 	kube, err := client.New(config, client.Options{Scheme: scheme})

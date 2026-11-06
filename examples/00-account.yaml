@@ -16,7 +16,7 @@
 #     kubectl create -f -
 #   unset key
 ---
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata:
   name: ravendb-cloud

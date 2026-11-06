@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 )
 
@@ -259,8 +259,8 @@ func TestConnectionSecretRefusesToAdoptSomebodyElsesSecret(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "someone-elses", Namespace: testNamespace},
 		Data:       map[string][]byte{"password": []byte("not-ours")},
 	}
-	cluster := provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.ConnectionSecret = &v1alpha1.ConnectionSecretSpec{Name: "someone-elses"}
+	cluster := provisionCluster("orders", func(c *cloudv1.CloudCluster) {
+		c.Spec.ConnectionSecret = &cloudv1.ConnectionSecretSpec{Name: "someone-elses"}
 	})
 	h := newHarness(t, credentialSecret(), readyAccount(), bystander, cluster)
 
@@ -288,8 +288,8 @@ func TestConnectionSecretRefusesToAdoptSomebodyElsesSecret(t *testing.T) {
 	// NameTaken, not Running. The cluster itself is fine, but the object did
 	// not get the Secret its spec asked for, and STATUS is the printer column,
 	// so Running here would say "done" about a manifest that was not honoured.
-	cond := meta.FindStatusCondition(settled.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonNameTaken {
+	cond := meta.FindStatusCondition(settled.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonNameTaken {
 		t.Fatalf("Ready = %+v, want reason NameTaken", cond)
 	}
 	if !contains(cond.Message, "spec.connectionSecret.name") {
@@ -328,7 +328,7 @@ func TestTurningTheCertificateOffRemovesIt(t *testing.T) {
 
 	cluster := h.getCluster("orders")
 	off := false
-	cluster.Spec.ConnectionSecret = &v1alpha1.ConnectionSecretSpec{IncludeCertificate: &off}
+	cluster.Spec.ConnectionSecret = &cloudv1.ConnectionSecretSpec{IncludeCertificate: &off}
 	if err := h.k8s.Update(context.Background(), cluster); err != nil {
 		t.Fatalf("turning the certificate off: %v", err)
 	}
@@ -372,7 +372,7 @@ func TestRenamingTheSecretEmptiesTheOldOne(t *testing.T) {
 	}
 
 	cluster := h.getCluster("orders")
-	cluster.Spec.ConnectionSecret = &v1alpha1.ConnectionSecretSpec{Name: "orders-elsewhere"}
+	cluster.Spec.ConnectionSecret = &cloudv1.ConnectionSecretSpec{Name: "orders-elsewhere"}
 	if err := h.k8s.Update(context.Background(), cluster); err != nil {
 		t.Fatalf("renaming the Secret: %v", err)
 	}
@@ -412,7 +412,7 @@ func TestRenamingAndDisablingTogetherLeavesNothingBehind(t *testing.T) {
 
 	cluster := h.getCluster("orders")
 	off := false
-	cluster.Spec.ConnectionSecret = &v1alpha1.ConnectionSecretSpec{Name: "orders-elsewhere", Enabled: &off}
+	cluster.Spec.ConnectionSecret = &cloudv1.ConnectionSecretSpec{Name: "orders-elsewhere", Enabled: &off}
 	if err := h.k8s.Update(context.Background(), cluster); err != nil {
 		t.Fatalf("renaming and disabling: %v", err)
 	}
@@ -442,7 +442,7 @@ func TestTurningPublicationOffRemovesEverything(t *testing.T) {
 
 	cluster := h.getCluster("orders")
 	off := false
-	cluster.Spec.ConnectionSecret = &v1alpha1.ConnectionSecretSpec{Enabled: &off}
+	cluster.Spec.ConnectionSecret = &cloudv1.ConnectionSecretSpec{Enabled: &off}
 	if err := h.k8s.Update(context.Background(), cluster); err != nil {
 		t.Fatalf("turning publication off: %v", err)
 	}
@@ -466,8 +466,8 @@ func TestTurningPublicationOffRemovesEverything(t *testing.T) {
 	}
 	// Publishing nothing is what was asked for, so the cluster is Running, and
 	// the message says the Secret is empty on purpose.
-	cond := meta.FindStatusCondition(settled.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonRunning || !contains(cond.Message, "enabled is false") {
+	cond := meta.FindStatusCondition(settled.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonRunning || !contains(cond.Message, "enabled is false") {
 		t.Fatalf("Ready = %+v, want Running saying publishing is off", cond)
 	}
 }
@@ -487,8 +487,8 @@ func TestPublicationOffDoesNotTouchSomebodyElsesSecret(t *testing.T) {
 		Data:       map[string][]byte{"password": []byte("not-ours")},
 	}
 	off := false
-	cluster := provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.ConnectionSecret = &v1alpha1.ConnectionSecretSpec{Name: "someone-elses", Enabled: &off}
+	cluster := provisionCluster("orders", func(c *cloudv1.CloudCluster) {
+		c.Spec.ConnectionSecret = &cloudv1.ConnectionSecretSpec{Name: "someone-elses", Enabled: &off}
 	})
 	h := newHarness(t, credentialSecret(), readyAccount(), bystander, cluster)
 

@@ -10,7 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 )
 
@@ -37,7 +37,7 @@ type driftPass struct {
 // API serialises them anyway and a second one stacked on the first is dropped.
 func (r *CloudClusterReconciler) reconcileDrift(
 	ctx context.Context,
-	cluster *v1alpha1.CloudCluster,
+	cluster *cloudv1.CloudCluster,
 	observed *cloudapi.Cluster,
 	cloud cloudapi.Client,
 ) (driftPass, error) {
@@ -61,7 +61,7 @@ func (r *CloudClusterReconciler) reconcileDrift(
 // behind an instance type RavenDB Cloud will never take. A busy cluster ends
 // the pass, since every other change would be refused the same way.
 func (r *CloudClusterReconciler) applyFirst(
-	ctx context.Context, cluster *v1alpha1.CloudCluster, observed *cloudapi.Cluster, differences []shapeDifference,
+	ctx context.Context, cluster *cloudv1.CloudCluster, observed *cloudapi.Cluster, differences []shapeDifference,
 ) (driftPass, error) {
 	var pass driftPass
 	for i := range differences {
@@ -89,7 +89,7 @@ func (r *CloudClusterReconciler) applyFirst(
 			pass.failed = diff
 			return pass, err
 		default:
-			emit(r.Recorder, cluster, corev1.EventTypeNormal, v1alpha1.EventApplying, "%s", sentence(diff.event))
+			emit(r.Recorder, cluster, corev1.EventTypeNormal, cloudv1.EventApplying, "%s", sentence(diff.event))
 			log.FromContext(ctx).Info("applying a change", "productID", observed.ID, "change", diff.event)
 			pass.applied = diff
 			return pass, nil
@@ -99,7 +99,7 @@ func (r *CloudClusterReconciler) applyFirst(
 }
 
 // whyNotApplied says why a change was not applied, and how to have it applied.
-func whyNotApplied(cluster *v1alpha1.CloudCluster) string {
+func whyNotApplied(cluster *cloudv1.CloudCluster) string {
 	if cluster.Spec.ManagementPolicy == "" {
 		return "managementPolicy is Observe, the default for a cluster this object " +
 			"found already running, so no changes were applied; " + howToAllowChanges(cluster) + " to apply them"
@@ -110,8 +110,8 @@ func whyNotApplied(cluster *v1alpha1.CloudCluster) string {
 // howToAllowChanges says what to write for the operator to change a cluster it
 // holds under Observe. Admission refuses Full under TakeOverOrCreate, so there
 // the manifest has to confirm the cluster as well.
-func howToAllowChanges(cluster *v1alpha1.CloudCluster) string {
-	if cluster.EffectiveCreationMode() == v1alpha1.CreationTakeOverOrCreate {
+func howToAllowChanges(cluster *cloudv1.CloudCluster) string {
+	if cluster.EffectiveCreationMode() == cloudv1.CreationTakeOverOrCreate {
 		return "set spec.creationMode to TakeOverOnly and spec.managementPolicy to Full"
 	}
 	return "set spec.managementPolicy to Full"
@@ -135,12 +135,12 @@ type shapeDifference struct {
 // shapeDifferences lists every divergence between spec and the live cluster, in
 // the order the mutating path acts on them. Reporting and applying both read
 // this one list, so no field can be applied without being reportable.
-func shapeDifferences(spec *v1alpha1.CloudClusterSpec, observed *cloudapi.Cluster, cloud cloudapi.Client) []shapeDifference {
+func shapeDifferences(spec *cloudv1.CloudClusterSpec, observed *cloudapi.Cluster, cloud cloudapi.Client) []shapeDifference {
 	var out []shapeDifference
 
 	// Binding refuses a cluster that differs in either. These are for a
 	// manifest that pins one later, a value first inherited from the account.
-	if spec.Provider != "" && v1alpha1.Provider(observed.Provider) != spec.Provider {
+	if spec.Provider != "" && cloudv1.Provider(observed.Provider) != spec.Provider {
 		out = append(out, shapeDifference{report: fmt.Sprintf(
 			"provider differs (desired %s, actual %s); a cluster cannot move between providers", spec.Provider, observed.Provider)})
 	}
@@ -181,7 +181,7 @@ func shapeDifferences(spec *v1alpha1.CloudClusterSpec, observed *cloudapi.Cluste
 
 // nodeDifference compares the desired node count with the live one, and moves
 // it by one node per pass.
-func nodeDifference(spec *v1alpha1.CloudClusterSpec, observed *cloudapi.Cluster, cloud cloudapi.Client) []shapeDifference {
+func nodeDifference(spec *cloudv1.CloudClusterSpec, observed *cloudapi.Cluster, cloud cloudapi.Client) []shapeDifference {
 	if spec.Nodes == nil {
 		return nil
 	}
@@ -221,7 +221,7 @@ func nodeDifference(spec *v1alpha1.CloudClusterSpec, observed *cloudapi.Cluster,
 // names only a size never touches the disk class or its IOPS. The storage
 // endpoint takes size, type, iops and throughput in one request, so whatever
 // can be applied goes out as a single change.
-func storageDifference(spec *v1alpha1.CloudClusterSpec, observed *cloudapi.Cluster, cloud cloudapi.Client) []shapeDifference {
+func storageDifference(spec *cloudv1.CloudClusterSpec, observed *cloudapi.Cluster, cloud cloudapi.Client) []shapeDifference {
 	desired, current := spec.Storage, observed.Hardware.Storage
 	if why := unreachableSize(desired.SizeGB, current); why != "" {
 		return []shapeDifference{{report: why}}
@@ -303,7 +303,7 @@ func unreachableSize(desired int32, current cloudapi.Storage) string {
 // or not at all. Both belong to a disk class, so a class change that leaves
 // them out asks for the new class's defaults rather than carrying the old
 // class's values over.
-func storageChange(desired v1alpha1.StorageSpec, current cloudapi.Storage) cloudapi.StorageChange {
+func storageChange(desired cloudv1.StorageSpec, current cloudapi.Storage) cloudapi.StorageChange {
 	change := cloudapi.StorageChange{
 		SizeGiB:        cmp.Or(desired.SizeGB, current.SizeGiB),
 		Type:           cmp.Or(cloudapi.StorageType(desired.Type), current.Type),

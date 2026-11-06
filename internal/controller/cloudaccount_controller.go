@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudclients"
 )
@@ -84,7 +84,7 @@ type CloudAccountReconciler struct {
 
 // Reconcile verifies the credential and refreshes the cached lists.
 func (r *CloudAccountReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	var account v1alpha1.CloudAccount
+	var account cloudv1.CloudAccount
 	if err := r.Get(ctx, req.NamespacedName, &account); err != nil {
 		if apierrors.IsNotFound(err) {
 			// So a deleted account's credential does not stay in memory.
@@ -125,7 +125,7 @@ func (r *CloudAccountReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	account.Status.DomainName = info.DomainName
 	now := metav1.Now()
 	account.Status.LastVerifiedTime = &now
-	r.ready(ctx, &account, v1alpha1.ReasonVerified,
+	r.ready(ctx, &account, cloudv1.ReasonVerified,
 		fmt.Sprintf("RavenDB Cloud accepted the API key for account %s.", info.DomainName))
 
 	requeue := r.refreshCatalogue(ctx, cloud, original, &account)
@@ -134,7 +134,7 @@ func (r *CloudAccountReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 // addFinalizer adds the finalizer as a merge patch of the difference, never an
 // Update: see addFinalizer on the CloudCluster reconciler.
-func (r *CloudAccountReconciler) addFinalizer(ctx context.Context, account *v1alpha1.CloudAccount) error {
+func (r *CloudAccountReconciler) addFinalizer(ctx context.Context, account *cloudv1.CloudAccount) error {
 	if controllerutil.ContainsFinalizer(account, accountFinalizer) {
 		return nil
 	}
@@ -146,18 +146,18 @@ func (r *CloudAccountReconciler) addFinalizer(ctx context.Context, account *v1al
 // keyUnreadable reports an API key the operator could not read. A missing
 // Secret usually arrives moments after the account, so it waits for the watch
 // rather than burning retries.
-func (r *CloudAccountReconciler) keyUnreadable(ctx context.Context, account *v1alpha1.CloudAccount, err error) (ctrl.Result, error) {
+func (r *CloudAccountReconciler) keyUnreadable(ctx context.Context, account *cloudv1.CloudAccount, err error) (ctrl.Result, error) {
 	var missing *cloudclients.CredentialMissingError
 	if errors.As(err, &missing) {
-		r.ready(ctx, account, v1alpha1.ReasonKeyMissing, sentence(missing.Error()))
+		r.ready(ctx, account, cloudv1.ReasonKeyMissing, sentence(missing.Error()))
 		return ctrl.Result{RequeueAfter: credentialWaitRequeue}, nil
 	}
-	r.ready(ctx, account, v1alpha1.ReasonKeyMissing, sentence("Could not read the API key: "+err.Error())+" Retrying.")
+	r.ready(ctx, account, cloudv1.ReasonKeyMissing, sentence("Could not read the API key: "+err.Error())+" Retrying.")
 	return ctrl.Result{}, err
 }
 
 // verificationFailed reports a key RavenDB Cloud did not confirm.
-func (r *CloudAccountReconciler) verificationFailed(ctx context.Context, account *v1alpha1.CloudAccount, err error) (ctrl.Result, error) {
+func (r *CloudAccountReconciler) verificationFailed(ctx context.Context, account *cloudv1.CloudAccount, err error) (ctrl.Result, error) {
 	switch {
 	case cloudapi.IsUnauthorized(err):
 		answered := cloudSaid(err)
@@ -165,16 +165,16 @@ func (r *CloudAccountReconciler) verificationFailed(ctx context.Context, account
 		if errors.As(err, &apiErr) {
 			answered = apiErr.Status()
 		}
-		r.ready(ctx, account, v1alpha1.ReasonKeyRejected, keyRejectedMessage(account, answered))
+		r.ready(ctx, account, cloudv1.ReasonKeyRejected, keyRejectedMessage(account, answered))
 		return ctrl.Result{RequeueAfter: credentialRejectedRequeue}, nil
 	case cloudapi.IsRetryable(err):
-		r.ready(ctx, account, v1alpha1.ReasonCloudUnreachable,
+		r.ready(ctx, account, cloudv1.ReasonCloudUnreachable,
 			sentence("Could not verify the API key: "+cloudSaid(err))+" Retrying.")
 		return ctrl.Result{}, err
 	}
 	// A no that does not say the key is wrong, such as a 404 from something
 	// that is not RavenDB Cloud. It will say the same next time.
-	r.ready(ctx, account, v1alpha1.ReasonUnexpectedResponse,
+	r.ready(ctx, account, cloudv1.ReasonUnexpectedResponse,
 		sentence("Could not verify the API key: "+cloudSaid(err))+
 			" Trying again in "+credentialRejectedRequeue.String()+".")
 	return ctrl.Result{RequeueAfter: credentialRejectedRequeue}, nil
@@ -184,7 +184,7 @@ func (r *CloudAccountReconciler) verificationFailed(ctx context.Context, account
 // they are due, and returns when to look again. A failed refresh does not make
 // the account unusable, so it is logged rather than put on Ready.
 func (r *CloudAccountReconciler) refreshCatalogue(
-	ctx context.Context, cloud cloudapi.Client, original, account *v1alpha1.CloudAccount,
+	ctx context.Context, cloud cloudapi.Client, original, account *cloudv1.CloudAccount,
 ) time.Duration {
 	interval := account.EffectiveRefreshInterval()
 	if catalogueMoved(original, account) {
@@ -215,7 +215,7 @@ func (r *CloudAccountReconciler) refreshCatalogue(
 // reconcileDelete releases the account once nothing depends on it. No timer
 // while it waits: the CloudCluster watch wakes it when the last one goes.
 func (r *CloudAccountReconciler) reconcileDelete(
-	ctx context.Context, original, account *v1alpha1.CloudAccount,
+	ctx context.Context, original, account *cloudv1.CloudAccount,
 ) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(account, accountFinalizer) {
 		return ctrl.Result{}, nil
@@ -245,9 +245,9 @@ func (r *CloudAccountReconciler) reconcileDelete(
 // clustersUsing names the CloudClusters that reference this account, sorted so
 // the message does not reshuffle between reconciles.
 func (r *CloudAccountReconciler) clustersUsing(
-	ctx context.Context, account *v1alpha1.CloudAccount,
+	ctx context.Context, account *cloudv1.CloudAccount,
 ) ([]string, error) {
-	var list v1alpha1.CloudClusterList
+	var list cloudv1.CloudClusterList
 	if err := r.List(ctx, &list,
 		client.InNamespace(account.Namespace),
 		client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(accountRefIndex, account.Name)},
@@ -269,7 +269,7 @@ func (r *CloudAccountReconciler) clustersUsing(
 // interval, so without this a new Secret or key would sit beside the
 // old account's regions and default channel for up to an hour. A spec edit
 // that moved nothing costs one refresh.
-func catalogueMoved(original, account *v1alpha1.CloudAccount) bool {
+func catalogueMoved(original, account *cloudv1.CloudAccount) bool {
 	if original.Status.RefreshedAt == nil {
 		return false
 	}
@@ -277,12 +277,12 @@ func catalogueMoved(original, account *v1alpha1.CloudAccount) bool {
 		original.Status.DomainName != account.Status.DomainName
 }
 
-func needsRefresh(account *v1alpha1.CloudAccount, interval time.Duration) bool {
+func needsRefresh(account *cloudv1.CloudAccount, interval time.Duration) bool {
 	return len(account.Status.Providers) == 0 || len(account.Status.ReleaseChannels) == 0 ||
 		account.Status.RefreshedAt == nil || time.Since(account.Status.RefreshedAt.Time) >= interval
 }
 
-func (r *CloudAccountReconciler) refresh(ctx context.Context, cloud cloudapi.Client, account *v1alpha1.CloudAccount) error {
+func (r *CloudAccountReconciler) refresh(ctx context.Context, cloud cloudapi.Client, account *cloudv1.CloudAccount) error {
 	channels, err := cloud.ListReleaseChannels(ctx)
 	if err != nil {
 		return err
@@ -290,20 +290,20 @@ func (r *CloudAccountReconciler) refresh(ctx context.Context, cloud cloudapi.Cli
 	account.Status.DefaultReleaseChannel = channels.Default
 	account.Status.ReleaseChannels = nil
 	for _, ch := range channels.Channels {
-		account.Status.ReleaseChannels = append(account.Status.ReleaseChannels, v1alpha1.ReleaseChannelStatus{
+		account.Status.ReleaseChannels = append(account.Status.ReleaseChannels, cloudv1.ReleaseChannelStatus{
 			Name:         ch.Name,
 			RavenVersion: ch.RavenVersion,
 			BuildType:    ch.BuildType,
 		})
 	}
 
-	var providers []v1alpha1.ProviderRegions
-	for _, provider := range []v1alpha1.Provider{v1alpha1.ProviderAWS, v1alpha1.ProviderAzure, v1alpha1.ProviderGCP} {
+	var providers []cloudv1.ProviderRegions
+	for _, provider := range []cloudv1.Provider{cloudv1.ProviderAWS, cloudv1.ProviderAzure, cloudv1.ProviderGCP} {
 		regions, err := cloud.ListRegions(ctx, cloudapi.Provider(provider))
 		if err != nil {
 			return err
 		}
-		providers = append(providers, v1alpha1.ProviderRegions{Provider: provider, Regions: regions})
+		providers = append(providers, cloudv1.ProviderRegions{Provider: provider, Regions: regions})
 	}
 	account.Status.Providers = providers
 	refreshed := metav1.Now()
@@ -317,7 +317,7 @@ func (r *CloudAccountReconciler) refresh(ctx context.Context, cloud cloudapi.Cli
 // with no body, so the message lists all three. The public API has no endpoint
 // to create a key (it serves account, metadata and products only), so the fix
 // is always a new key from the portal.
-func keyRejectedMessage(account *v1alpha1.CloudAccount, answered string) string {
+func keyRejectedMessage(account *cloudv1.CloudAccount, answered string) string {
 	return fmt.Sprintf(
 		"RavenDB Cloud answered %s: it does not accept the API key in Secret %s/%s, key %q. "+
 			"The key is mistyped, deactivated or past its expiry date. Create a key in the RavenDB Cloud portal "+
@@ -328,22 +328,22 @@ func keyRejectedMessage(account *v1alpha1.CloudAccount, answered string) string 
 // markInUse says what is holding a deleted account open, and leaves Ready's
 // status as the last verification left it: being deleted does not change
 // whether the key works.
-func (r *CloudAccountReconciler) markInUse(ctx context.Context, account *v1alpha1.CloudAccount, message string) {
-	if !meta.IsStatusConditionTrue(account.Status.Conditions, v1alpha1.ConditionReady) {
+func (r *CloudAccountReconciler) markInUse(ctx context.Context, account *cloudv1.CloudAccount, message string) {
+	if !meta.IsStatusConditionTrue(account.Status.Conditions, cloudv1.ConditionReady) {
 		message += " The credential is not usable either, so those clusters are waiting on it too."
 	}
-	r.ready(ctx, account, v1alpha1.ReasonInUse, message)
+	r.ready(ctx, account, cloudv1.ReasonInUse, message)
 }
 
 func (r *CloudAccountReconciler) finish(
-	ctx context.Context, original, account *v1alpha1.CloudAccount, result ctrl.Result, err error,
+	ctx context.Context, original, account *cloudv1.CloudAccount, result ctrl.Result, err error,
 ) (ctrl.Result, error) {
 	return writeStatus(ctx, r.Client, account, &original.Status, &account.Status, result, err)
 }
 
 // indexClustersByAccountRef indexes a CloudCluster by the account it names.
 func indexClustersByAccountRef(obj client.Object) []string {
-	cluster, ok := obj.(*v1alpha1.CloudCluster)
+	cluster, ok := obj.(*cloudv1.CloudCluster)
 	if !ok || cluster.Spec.AccountRef.Name == "" {
 		return nil
 	}
@@ -353,7 +353,7 @@ func indexClustersByAccountRef(obj client.Object) []string {
 // indexAccountsBySecretRef indexes a CloudAccount by the name of the Secret it
 // reads its API key from.
 func indexAccountsBySecretRef(obj client.Object) []string {
-	account, ok := obj.(*v1alpha1.CloudAccount)
+	account, ok := obj.(*cloudv1.CloudAccount)
 	if !ok || account.Spec.APIKeySecretRef.Name == "" {
 		return nil
 	}
@@ -364,19 +364,19 @@ func indexAccountsBySecretRef(obj client.Object) []string {
 // key rotation take effect at once.
 func (r *CloudAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(),
-		&v1alpha1.CloudAccount{}, secretRefIndex, indexAccountsBySecretRef); err != nil {
+		&cloudv1.CloudAccount{}, secretRefIndex, indexAccountsBySecretRef); err != nil {
 		return err
 	}
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(),
-		&v1alpha1.CloudCluster{}, accountRefIndex, indexClustersByAccountRef); err != nil {
+		&cloudv1.CloudCluster{}, accountRefIndex, indexClustersByAccountRef); err != nil {
 		return err
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.CloudAccount{}, builder.WithPredicates(ignoreStatusOnlyUpdates())).
+		For(&cloudv1.CloudAccount{}, builder.WithPredicates(ignoreStatusOnlyUpdates())).
 		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.accountsUsingSecret), builder.OnlyMetadata).
 		// Clusters arriving and leaving change who holds the account open.
-		Watches(&v1alpha1.CloudCluster{},
+		Watches(&cloudv1.CloudCluster{},
 			handler.EnqueueRequestsFromMapFunc(r.accountAwaitingCluster),
 			builder.WithPredicates(arrivalsAndDepartures())).
 		WithOptions(controllerOptions()).
@@ -387,13 +387,13 @@ func (r *CloudAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // accountAwaitingCluster enqueues the account a cluster is holding open, and
 // only while that account is waiting to be deleted.
 func (r *CloudAccountReconciler) accountAwaitingCluster(ctx context.Context, obj client.Object) []reconcile.Request {
-	cluster, ok := obj.(*v1alpha1.CloudCluster)
+	cluster, ok := obj.(*cloudv1.CloudCluster)
 	if !ok || cluster.Spec.AccountRef.Name == "" {
 		return nil
 	}
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.Spec.AccountRef.Name}
 
-	var account v1alpha1.CloudAccount
+	var account cloudv1.CloudAccount
 	if err := r.Get(ctx, key, &account); err != nil {
 		// A map function can only return nothing, so a failure other than the
 		// account being gone is logged.
@@ -409,7 +409,7 @@ func (r *CloudAccountReconciler) accountAwaitingCluster(ctx context.Context, obj
 }
 
 func (r *CloudAccountReconciler) accountsUsingSecret(ctx context.Context, obj client.Object) []reconcile.Request {
-	var list v1alpha1.CloudAccountList
+	var list cloudv1.CloudAccountList
 	if err := r.List(ctx, &list,
 		client.InNamespace(obj.GetNamespace()),
 		client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(secretRefIndex, obj.GetName())},

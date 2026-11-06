@@ -14,7 +14,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	k8sfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 )
 
 // TestAccountsShareOneRateLimiter is a behavioural test because there is no
@@ -73,7 +73,7 @@ func newTestCache(t *testing.T, endpoint string, limit rate.Limit) *Cache {
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
 		t.Fatalf("client-go scheme: %v", err)
 	}
-	if err := v1alpha1.AddToScheme(scheme); err != nil {
+	if err := cloudv1.AddToScheme(scheme); err != nil {
 		t.Fatalf("operator scheme: %v", err)
 	}
 	secret := &corev1.Secret{
@@ -88,11 +88,11 @@ func newTestCache(t *testing.T, endpoint string, limit rate.Limit) *Cache {
 	}
 }
 
-func testAccount(name string) *v1alpha1.CloudAccount {
-	return &v1alpha1.CloudAccount{
+func testAccount(name string) *cloudv1.CloudAccount {
+	return &cloudv1.CloudAccount{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "apps"},
-		Spec: v1alpha1.CloudAccountSpec{
-			APIKeySecretRef: v1alpha1.SecretKeySelector{Name: "key", Key: "apiKey"},
+		Spec: cloudv1.CloudAccountSpec{
+			APIKeySecretRef: cloudv1.SecretKeySelector{Name: "key", Key: "apiKey"},
 		},
 	}
 }

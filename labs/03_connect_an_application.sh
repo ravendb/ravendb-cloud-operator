@@ -202,7 +202,7 @@ if on_mock; then
   PRODUCT_ID="$SEED_ID"
   info "seeded PB10 cluster $PRODUCT_ID (three nodes) as 'lab03-app'"
   kubectl apply -n "$LAB_NAMESPACE" -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $CLUSTER
@@ -216,7 +216,7 @@ YAML
 else
   info "provisioning a Development cluster; this takes minutes, not seconds"
   kubectl apply -n "$LAB_NAMESPACE" -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $CLUSTER
@@ -569,7 +569,7 @@ SQUAT_ID="$(lab_api POST /_lab/clusters \
 check_not_empty "a second cluster, $SQUATTER" "$SQUAT_ID"
 info "taking $SQUAT_ID over from a second object, aimed at $CLUSTER's Secret"
 kubectl apply -n "$LAB_NAMESPACE" -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $SQUATTER
@@ -752,7 +752,7 @@ if on_mock; then
 else
   info "taking $PRODUCT_ID over again just to terminate it"
   kubectl apply -n "$LAB_NAMESPACE" -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: lab03-reaper

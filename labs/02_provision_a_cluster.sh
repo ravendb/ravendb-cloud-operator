@@ -87,7 +87,7 @@ if on_cloud; then
   note "neither may collide with what is already there"
 fi
 k apply -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: lab02-orders
@@ -159,7 +159,7 @@ made() { case " $LAB02_MADE " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
 if costly "the fully specified Production contrast (three nodes, PB20, 100 GB)"; then
 step "Provisioning the fully specified contrast"
 k apply -f - >/dev/null <<'YAML'
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: lab02-analytics
@@ -336,7 +336,7 @@ step "A typo in accountRef: the cluster waits, and an edit fixes it"
 # Observe never creates anything, so fixing the typo below costs nothing on
 # either control plane.
 k apply -f - >/dev/null <<'YAML'
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: lab02-pending
@@ -408,7 +408,7 @@ step "Crash safety: an interrupted create finds its own cluster, and knows it is
 # its status gets the marker a create writes; and a cluster by its name appears
 # in the control plane, as if the create had landed.
 k apply -f - >/dev/null <<'YAML'
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: lab02-twin

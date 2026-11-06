@@ -33,7 +33,7 @@ already earns its keep: the API spells providers `Aws`/`Gcp`, the CRD spells the
 `AWS`/`GCP`.
 
 ```
-api/v1alpha1/             CRD types, CEL rules, conditions
+api/v1/             CRD types, CEL rules, conditions
 cmd/                      the manager
 cmd/kubectl-ravendb_cloud/ the kubectl plugin, whose export writes manifests
 internal/cloudapi/        the client interface, its one REST implementation, wire mapping

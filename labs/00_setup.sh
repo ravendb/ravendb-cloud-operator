@@ -136,7 +136,7 @@ if on_cloud; then
     --from-file=apiKey="$LAB_CLOUD_API_KEY_FILE" \
     --dry-run=client -o yaml | kubectl apply -f - >/dev/null
   kubectl apply -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata:
   name: ravendb-cloud

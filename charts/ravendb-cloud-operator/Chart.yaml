@@ -32,17 +32,17 @@ annotations:
       url: https://cloud.ravendb.net
   artifacthub.io/crds: |
     - kind: CloudAccount
-      version: v1alpha1
+      version: v1
       name: cloudaccounts.cloud.ravendb.net
       displayName: RavenDB Cloud account
       description: A RavenDB Cloud API key, read from a Secret, and the defaults its clusters inherit.
     - kind: CloudCluster
-      version: v1alpha1
+      version: v1
       name: cloudclusters.cloud.ravendb.net
       displayName: RavenDB Cloud cluster
       description: One RavenDB Cloud cluster, created or taken over by its display name, with its connection details published into a Secret.
     - kind: CloudClusterRestart
-      version: v1alpha1
+      version: v1
       name: cloudclusterrestarts.cloud.ravendb.net
       displayName: Node restart
       description: One restart of one node of a RavenDB Cloud cluster, done once.

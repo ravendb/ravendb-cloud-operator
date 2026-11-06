@@ -158,7 +158,7 @@ EOF
 # apply_account <name> <secret>
 apply_account() {
   cat <<EOF | kubectl apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata:
   name: $1
@@ -180,7 +180,7 @@ EOF
 # apply_terminate_cluster: the Part 2 manifest, applied twice.
 apply_terminate_cluster() {
   cat <<EOF | kubectl apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $TERMINATE
@@ -254,7 +254,7 @@ info "starting from a clean slate"
 step "Part 1: provision a cluster and leave deletionPolicy alone"
 
 cat <<EOF | kubectl apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $RETAIN
@@ -354,7 +354,7 @@ ADOPT_RETAIN_ID="$(seed_cloud_cluster "$(lab_display legacy-c)")"
 check_not_empty "seeded cluster for $ADOPT_RETAIN" "$ADOPT_RETAIN_ID"
 
 cat <<EOF | kubectl apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $ADOPT_RETAIN
@@ -391,7 +391,7 @@ check_not_empty "seeded cluster for $ADOPT_TERMINATE" "$ADOPT_TERMINATE_ID"
 # or without one when mode is empty.
 adopt_terminate_manifest() {
   cat <<EOF
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $ADOPT_TERMINATE
@@ -440,7 +440,7 @@ GONE_NAME="$(lab_display gone)"
 GONE_ID="$(seed_cloud_cluster "$GONE_NAME")"
 check_not_empty "seeded cluster for $GONE" "$GONE_ID"
 cat <<EOF | kubectl apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $GONE
@@ -513,7 +513,7 @@ wait_for cloudaccount "$ACCOUNT" '.status.conditions[?(@.type=="Ready")].status'
 # account, bound or not.
 for name in "$HOLDER" "$SECOND"; do
   cat <<EOF | kubectl apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $name
@@ -557,7 +557,7 @@ step "Part 5: a teardown that deletes the key, the account and a Terminate clust
 apply_account "$ACCOUNT" "$KEY_SECRET"
 wait_for cloudaccount "$ACCOUNT" '.status.conditions[?(@.type=="Ready")].status' True 120 >/dev/null || true
 cat <<EOF | kubectl apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $TOGETHER
@@ -605,7 +605,7 @@ step "Appendix: nothing to act on"
 # resolved, so even an object whose account does not exist has one. It still
 # deletes at once: nothing was created, so there is nothing to terminate.
 cat <<EOF | kubectl apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $NOACCOUNT
@@ -635,7 +635,7 @@ wait_for cloudaccount "$GUEST_ACCOUNT" '.status.conditions[?(@.type=="Ready")].s
 NOCRED_RETAIN_ID="$(seed_cloud_cluster "$(lab_display legacy-a)")"
 NOCRED_TERMINATE_ID="$(seed_cloud_cluster "$(lab_display legacy-b)")"
 cat <<EOF | kubectl apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $NOCRED_RETAIN
@@ -648,7 +648,7 @@ spec:
   displayName: $(lab_display legacy-a)
   tier: Production
 ---
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $NOCRED_TERMINATE

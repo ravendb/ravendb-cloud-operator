@@ -49,7 +49,7 @@ metadata:
 stringData:
   apiKey: lab-api-key            # the key the simulator accepts
 ---
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata:
   name: ravendb-cloud

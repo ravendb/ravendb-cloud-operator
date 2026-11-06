@@ -1,4 +1,4 @@
-// Package v1alpha1 contains the API schema for the RavenDB Cloud operator.
+// Package v1 contains the API schema for the RavenDB Cloud operator.
 //
 // The group is cloud.ravendb.net, deliberately separate from the self-hosted
 // RavenDB operator, so both can be installed in one cluster without either kind
@@ -6,7 +6,7 @@
 //
 // +kubebuilder:object:generate=true
 // +groupName=cloud.ravendb.net
-package v1alpha1
+package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,7 +16,7 @@ import (
 
 var (
 	// GroupVersion is the group version used to register these objects.
-	GroupVersion = schema.GroupVersion{Group: "cloud.ravendb.net", Version: "v1alpha1"}
+	GroupVersion = schema.GroupVersion{Group: "cloud.ravendb.net", Version: "v1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme.
 	//

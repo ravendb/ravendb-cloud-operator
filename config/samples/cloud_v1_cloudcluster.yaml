@@ -4,7 +4,7 @@
 # in the account, this object takes it over; if not, the operator creates it.
 # Everything below tier can be omitted and inherited from the CloudAccount or
 # resolved by the operator, and a field written here is a field it manages.
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: orders-prod

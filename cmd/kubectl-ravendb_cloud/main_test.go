@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudsim"
 	"github.com/ravendb/ravendb-cloud-operator/internal/version"
@@ -92,10 +92,10 @@ func TestAKeyInTheEnvironmentNeedsNoCluster(t *testing.T) {
 func TestTheKeyComesFromTheAccountsSecret(t *testing.T) {
 	server := simulatorWith(t, "a-key", "orders")
 	kube := clusterWith(t,
-		&v1alpha1.CloudAccount{
+		&cloudv1.CloudAccount{
 			ObjectMeta: metav1.ObjectMeta{Name: "ravendb-cloud", Namespace: "apps"},
-			Spec: v1alpha1.CloudAccountSpec{
-				APIKeySecretRef: v1alpha1.SecretKeySelector{Name: "ravendb-cloud-key"},
+			Spec: cloudv1.CloudAccountSpec{
+				APIKeySecretRef: cloudv1.SecretKeySelector{Name: "ravendb-cloud-key"},
 			},
 		},
 		&corev1.Secret{
@@ -153,7 +153,7 @@ func clusterWith(t *testing.T, objects ...client.Object) client.Client {
 	if err := corev1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
-	if err := v1alpha1.AddToScheme(scheme); err != nil {
+	if err := cloudv1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
 	return k8sfake.NewClientBuilder().WithScheme(scheme).WithObjects(objects...).Build()

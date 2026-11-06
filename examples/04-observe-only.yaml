@@ -17,7 +17,7 @@
 # The object name is yours; displayName is the cluster's name in the portal,
 # case aside. A Free cluster works the same way, with tier Free: the API
 # cannot create one, so a Free CloudCluster only ever finds one.
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: search

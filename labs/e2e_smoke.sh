@@ -250,7 +250,7 @@ if [ "$MODE" = operator ]; then
     --from-literal=apiKey="$RAVENDB_CLOUD_API_KEY" \
     --dry-run=client -o yaml | kubectl apply -f - >/dev/null
   kubectl -n "$LAB_NAMESPACE" apply -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata:
   name: $SMOKE_ACCOUNT

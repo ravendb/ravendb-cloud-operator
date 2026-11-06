@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 )
 
@@ -68,7 +68,7 @@ func countContaining(events []string, reason string) int {
 
 // editSpec changes a cluster's spec the way kubectl apply does, which moves the
 // generation on. The fake client does not do that itself.
-func (h *harness) editSpec(name string, edit func(*v1alpha1.CloudCluster)) {
+func (h *harness) editSpec(name string, edit func(*cloudv1.CloudCluster)) {
 	h.t.Helper()
 	cluster := h.getCluster(name)
 	edit(cluster)
@@ -85,7 +85,7 @@ func (h *harness) reconcileClusterWithError(name string) (ctrl.Result, error) {
 	})
 }
 
-func condition(t *testing.T, cluster *v1alpha1.CloudCluster, condType string) metav1.Condition {
+func condition(t *testing.T, cluster *cloudv1.CloudCluster, condType string) metav1.Condition {
 	t.Helper()
 	cond := meta.FindStatusCondition(cluster.Status.Conditions, condType)
 	if cond == nil {
@@ -99,7 +99,7 @@ func resizedOnce(t *testing.T) *harness {
 	t.Helper()
 	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders"))
 	h.reconcileClusterUntilSettled("orders", 6)
-	h.editSpec("orders", func(c *v1alpha1.CloudCluster) { c.Spec.Storage.SizeGB = 30 })
+	h.editSpec("orders", func(c *cloudv1.CloudCluster) { c.Spec.Storage.SizeGB = 30 })
 	h.reconcileClusterUntilSettled("orders", 6)
 	if got := h.getCluster("orders").Status.Hardware.Storage.SizeGB; got != 30 {
 		t.Fatalf("the first resize did not land: size %d", got)
@@ -115,7 +115,7 @@ func resizedOnce(t *testing.T) *harness {
 // the window opens, and leaves Synced saying the spec matches.
 func TestASecondStorageChangeWaitsInsteadOfFailing(t *testing.T) {
 	h := resizedOnce(t)
-	h.editSpec("orders", func(c *v1alpha1.CloudCluster) { c.Spec.Storage.SizeGB = 50 })
+	h.editSpec("orders", func(c *cloudv1.CloudCluster) { c.Spec.Storage.SizeGB = 50 })
 
 	result := h.reconcileCluster("orders")
 	cluster := h.getCluster("orders")
@@ -123,11 +123,11 @@ func TestASecondStorageChangeWaitsInsteadOfFailing(t *testing.T) {
 	if got := h.cloud.CallCount("ChangeStorage"); got != 2 {
 		t.Fatalf("ChangeStorage called %d times, want the second one sent and refused", got)
 	}
-	if ready := condition(t, cluster, v1alpha1.ConditionReady); ready.Status != metav1.ConditionTrue {
+	if ready := condition(t, cluster, cloudv1.ConditionReady); ready.Status != metav1.ConditionTrue {
 		t.Errorf("Ready = %s %s, want True", ready.Status, ready.Reason)
 	}
-	synced := condition(t, cluster, v1alpha1.ConditionSynced)
-	if synced.Status != metav1.ConditionFalse || synced.Reason != v1alpha1.ReasonWaiting {
+	synced := condition(t, cluster, cloudv1.ConditionSynced)
+	if synced.Status != metav1.ConditionFalse || synced.Reason != cloudv1.ReasonWaiting {
 		t.Fatalf("Synced = %s %s %q, want False Waiting", synced.Status, synced.Reason, synced.Message)
 	}
 	for _, want := range []string{"resizing storage from 30 GB to 50 GB", "available in", "asks again"} {
@@ -139,7 +139,7 @@ func TestASecondStorageChangeWaitsInsteadOfFailing(t *testing.T) {
 	if result.RequeueAfter != cluster.EffectivePollInterval() {
 		t.Errorf("RequeueAfter = %v, want the poll interval, so the change is asked for again on its own", result.RequeueAfter)
 	}
-	if n := countContaining(h.events(), v1alpha1.ReasonWaiting); n != 1 {
+	if n := countContaining(h.events(), cloudv1.ReasonWaiting); n != 1 {
 		t.Errorf("%d Waiting events, want 1 when the wait starts", n)
 	}
 
@@ -147,7 +147,7 @@ func TestASecondStorageChangeWaitsInsteadOfFailing(t *testing.T) {
 	// again.
 	h.cloud.State().Advance(time.Hour)
 	h.reconcileCluster("orders")
-	if n := countContaining(h.events(), v1alpha1.ReasonWaiting); n != 0 {
+	if n := countContaining(h.events(), cloudv1.ReasonWaiting); n != 0 {
 		t.Errorf("%d more Waiting events while nothing changed", n)
 	}
 
@@ -155,7 +155,7 @@ func TestASecondStorageChangeWaitsInsteadOfFailing(t *testing.T) {
 	// the object.
 	h.cloud.State().Advance(6 * time.Hour)
 	h.reconcileCluster("orders")
-	if got := condition(t, h.getCluster("orders"), v1alpha1.ConditionSynced).Reason; got != v1alpha1.ReasonApplying {
+	if got := condition(t, h.getCluster("orders"), cloudv1.ConditionSynced).Reason; got != cloudv1.ReasonApplying {
 		t.Errorf("after the window Synced reason = %q, want Applying", got)
 	}
 	settled := h.reconcileClusterUntilSettled("orders", 6)
@@ -168,7 +168,7 @@ func TestASecondStorageChangeWaitsInsteadOfFailing(t *testing.T) {
 // hours, and a node count has nothing to do with it.
 func TestAPostponedChangeDoesNotHoldBackTheNextOne(t *testing.T) {
 	h := resizedOnce(t)
-	h.editSpec("orders", func(c *v1alpha1.CloudCluster) {
+	h.editSpec("orders", func(c *cloudv1.CloudCluster) {
 		c.Spec.Storage.SizeGB = 50
 		nodes := int32(4)
 		c.Spec.Nodes = &nodes
@@ -186,15 +186,15 @@ func TestAPostponedChangeDoesNotHoldBackTheNextOne(t *testing.T) {
 func TestSyncedSaysAChangeIsBeingApplied(t *testing.T) {
 	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders"))
 	h.reconcileClusterUntilSettled("orders", 6)
-	if got := condition(t, h.getCluster("orders"), v1alpha1.ConditionSynced).Reason; got != v1alpha1.ReasonApplied {
+	if got := condition(t, h.getCluster("orders"), cloudv1.ConditionSynced).Reason; got != cloudv1.ReasonApplied {
 		t.Fatalf("settled Synced reason = %q, want Applied to start from", got)
 	}
 
-	h.editSpec("orders", func(c *v1alpha1.CloudCluster) { c.Spec.Storage.SizeGB = 30 })
+	h.editSpec("orders", func(c *cloudv1.CloudCluster) { c.Spec.Storage.SizeGB = 30 })
 	h.reconcileCluster("orders")
 
-	synced := condition(t, h.getCluster("orders"), v1alpha1.ConditionSynced)
-	if synced.Status != metav1.ConditionFalse || synced.Reason != v1alpha1.ReasonApplying {
+	synced := condition(t, h.getCluster("orders"), cloudv1.ConditionSynced)
+	if synced.Status != metav1.ConditionFalse || synced.Reason != cloudv1.ReasonApplying {
 		t.Errorf("Synced = %s %s %q, want False Applying", synced.Status, synced.Reason, synced.Message)
 	}
 	if !strings.Contains(synced.Message, "20 GB to 30 GB") {
@@ -211,16 +211,16 @@ func TestARefusedChangeLeavesTheClusterReady(t *testing.T) {
 	h.reconcileClusterUntilSettled("orders", 6)
 	h.events()
 
-	h.editSpec("orders", func(c *v1alpha1.CloudCluster) { c.Spec.Storage.SizeGB = 30 })
+	h.editSpec("orders", func(c *cloudv1.CloudCluster) { c.Spec.Storage.SizeGB = 30 })
 	h.cloud.FailNext("ChangeStorage", http.StatusBadRequest)
 	result := h.reconcileCluster("orders")
 	cluster := h.getCluster("orders")
 
-	if ready := condition(t, cluster, v1alpha1.ConditionReady); ready.Status != metav1.ConditionTrue {
+	if ready := condition(t, cluster, cloudv1.ConditionReady); ready.Status != metav1.ConditionTrue {
 		t.Errorf("Ready = %s %s, want True", ready.Status, ready.Reason)
 	}
-	synced := condition(t, cluster, v1alpha1.ConditionSynced)
-	if synced.Reason != v1alpha1.ReasonRefused || synced.Status != metav1.ConditionFalse {
+	synced := condition(t, cluster, cloudv1.ConditionSynced)
+	if synced.Reason != cloudv1.ReasonRefused || synced.Status != metav1.ConditionFalse {
 		t.Fatalf("Synced = %s %s, want False Refused", synced.Status, synced.Reason)
 	}
 	readable(t, "Synced message", synced.Message)
@@ -230,7 +230,7 @@ func TestARefusedChangeLeavesTheClusterReady(t *testing.T) {
 	if result.RequeueAfter == 0 {
 		t.Error("no requeue: the cluster would stop being observed until somebody edits it")
 	}
-	if countContaining(h.events(), v1alpha1.ReasonRefused) != 1 {
+	if countContaining(h.events(), cloudv1.ReasonRefused) != 1 {
 		t.Error("expected one Refused warning")
 	}
 
@@ -240,12 +240,12 @@ func TestARefusedChangeLeavesTheClusterReady(t *testing.T) {
 	if got := h.cloud.CallCount("ChangeStorage"); got != 1 {
 		t.Errorf("ChangeStorage called %d times: a refusal that will repeat was asked again", got)
 	}
-	if got := condition(t, h.getCluster("orders"), v1alpha1.ConditionSynced).Reason; got != v1alpha1.ReasonRefused {
+	if got := condition(t, h.getCluster("orders"), cloudv1.ConditionSynced).Reason; got != cloudv1.ReasonRefused {
 		t.Errorf("Synced reason after the next poll = %q, want the refusal to stand", got)
 	}
 
 	// A spec edit is what lets it try again.
-	h.editSpec("orders", func(c *v1alpha1.CloudCluster) { c.Spec.Storage.SizeGB = 50 })
+	h.editSpec("orders", func(c *cloudv1.CloudCluster) { c.Spec.Storage.SizeGB = 50 })
 	h.reconcileCluster("orders")
 	if got := h.cloud.CallCount("ChangeStorage"); got != 2 {
 		t.Errorf("ChangeStorage called %d times after the spec changed, want 2", got)
@@ -257,10 +257,10 @@ func TestARefusedChangeLeavesTheClusterReady(t *testing.T) {
 func TestARefusalStopsStandingOnceTheClusterMatches(t *testing.T) {
 	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders"))
 	h.reconcileClusterUntilSettled("orders", 6)
-	h.editSpec("orders", func(c *v1alpha1.CloudCluster) { c.Spec.Storage.SizeGB = 30 })
+	h.editSpec("orders", func(c *cloudv1.CloudCluster) { c.Spec.Storage.SizeGB = 30 })
 	h.cloud.FailNext("ChangeStorage", http.StatusBadRequest)
 	h.reconcileCluster("orders")
-	if got := condition(t, h.getCluster("orders"), v1alpha1.ConditionSynced).Reason; got != v1alpha1.ReasonRefused {
+	if got := condition(t, h.getCluster("orders"), cloudv1.ConditionSynced).Reason; got != cloudv1.ReasonRefused {
 		t.Fatalf("Synced reason = %q, want Refused to start from", got)
 	}
 
@@ -270,7 +270,7 @@ func TestARefusalStopsStandingOnceTheClusterMatches(t *testing.T) {
 	}
 	h.reconcileCluster("orders")
 
-	if got := condition(t, h.getCluster("orders"), v1alpha1.ConditionSynced).Reason; got != v1alpha1.ReasonApplied {
+	if got := condition(t, h.getCluster("orders"), cloudv1.ConditionSynced).Reason; got != cloudv1.ReasonApplied {
 		t.Errorf("Synced reason = %q once the cluster matches, want Applied", got)
 	}
 }
@@ -287,8 +287,8 @@ func TestABlipDoesNotTurnAServingClusterToError(t *testing.T) {
 		t.Fatal("a 503 should go back to controller-runtime to be retried with backoff")
 	}
 
-	ready := condition(t, h.getCluster("orders"), v1alpha1.ConditionReady)
-	if ready.Status != metav1.ConditionUnknown || ready.Reason != v1alpha1.ReasonCloudUnreachable {
+	ready := condition(t, h.getCluster("orders"), cloudv1.ConditionReady)
+	if ready.Status != metav1.ConditionUnknown || ready.Reason != cloudv1.ReasonCloudUnreachable {
 		t.Errorf("Ready = %s %s, want Unknown CloudUnreachable", ready.Status, ready.Reason)
 	}
 	readable(t, "Ready message", ready.Message)
@@ -312,8 +312,8 @@ func TestARejectedKeyIsNotRetriedTightly(t *testing.T) {
 	if result.RequeueAfter == 0 {
 		t.Error("no requeue at all: the cluster would stop being observed")
 	}
-	ready := condition(t, h.getCluster("orders"), v1alpha1.ConditionReady)
-	if ready.Status != metav1.ConditionUnknown || ready.Reason != v1alpha1.ReasonKeyRejected {
+	ready := condition(t, h.getCluster("orders"), cloudv1.ConditionReady)
+	if ready.Status != metav1.ConditionUnknown || ready.Reason != cloudv1.ReasonKeyRejected {
 		t.Errorf("Ready = %s %s, want Unknown KeyRejected", ready.Status, ready.Reason)
 	}
 	if !strings.Contains(ready.Message, testAccountName) {
@@ -329,8 +329,8 @@ func TestARejectedKeySaysWhatItCanMeanAndHowToReplaceIt(t *testing.T) {
 	h.cloud.FailNext("GetAccountInfo", http.StatusUnauthorized)
 	h.reconcileAccount(testAccountName)
 
-	ready := meta.FindStatusCondition(h.getAccount(testAccountName).Status.Conditions, v1alpha1.ConditionReady)
-	if ready == nil || ready.Reason != v1alpha1.ReasonKeyRejected {
+	ready := meta.FindStatusCondition(h.getAccount(testAccountName).Status.Conditions, cloudv1.ConditionReady)
+	if ready == nil || ready.Reason != cloudv1.ReasonKeyRejected {
 		t.Fatalf("Ready = %+v, want KeyRejected", ready)
 	}
 	readable(t, "Ready message", ready.Message)
@@ -359,15 +359,15 @@ func TestAnOutageWhileCreatingIsNotAnInvalidSpec(t *testing.T) {
 		t.Fatal("a 503 should be retried with backoff")
 	}
 
-	ready := condition(t, h.getCluster("orders"), v1alpha1.ConditionReady)
-	if ready.Reason == v1alpha1.ReasonInvalidSpec {
+	ready := condition(t, h.getCluster("orders"), cloudv1.ConditionReady)
+	if ready.Reason == cloudv1.ReasonInvalidSpec {
 		t.Fatalf("a RavenDB Cloud outage was reported as an invalid spec: %q", ready.Message)
 	}
-	if ready.Reason != v1alpha1.ReasonCloudUnreachable {
+	if ready.Reason != cloudv1.ReasonCloudUnreachable {
 		t.Errorf("Ready reason = %q, want CloudUnreachable", ready.Reason)
 	}
 	readable(t, "Ready message", ready.Message)
-	if countContaining(h.events(), v1alpha1.ReasonInvalidSpec) != 0 {
+	if countContaining(h.events(), cloudv1.ReasonInvalidSpec) != 0 {
 		t.Error("a Warning told the user their spec was wrong")
 	}
 	if h.cloud.CallCount("CreateCluster") != 0 {
@@ -385,9 +385,9 @@ func TestABoundClusterIsUnknownWhileItsKeyIsRejected(t *testing.T) {
 
 	account := h.getAccount(testAccountName)
 	meta.SetStatusCondition(&account.Status.Conditions, metav1.Condition{
-		Type:               v1alpha1.ConditionReady,
+		Type:               cloudv1.ConditionReady,
 		Status:             metav1.ConditionFalse,
-		Reason:             v1alpha1.ReasonKeyRejected,
+		Reason:             cloudv1.ReasonKeyRejected,
 		Message:            "the key was rejected",
 		ObservedGeneration: account.Generation,
 	})
@@ -396,8 +396,8 @@ func TestABoundClusterIsUnknownWhileItsKeyIsRejected(t *testing.T) {
 	}
 
 	h.reconcileCluster("orders")
-	ready := condition(t, h.getCluster("orders"), v1alpha1.ConditionReady)
-	if ready.Status != metav1.ConditionUnknown || ready.Reason != v1alpha1.ReasonKeyRejected {
+	ready := condition(t, h.getCluster("orders"), cloudv1.ConditionReady)
+	if ready.Status != metav1.ConditionUnknown || ready.Reason != cloudv1.ReasonKeyRejected {
 		t.Errorf("Ready = %s %s, want Unknown KeyRejected", ready.Status, ready.Reason)
 	}
 	if !strings.Contains(ready.Message, "the key was rejected") {
@@ -415,8 +415,8 @@ func TestABoundClusterIsUnknownWhileItsKeyIsRejected(t *testing.T) {
 // Neither ever finished.
 func TestDeletingAnAccountTogetherWithItsClustersFinishes(t *testing.T) {
 	ctx := context.Background()
-	cluster := provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.DeletionPolicy = v1alpha1.DeletionTerminate
+	cluster := provisionCluster("orders", func(c *cloudv1.CloudCluster) {
+		c.Spec.DeletionPolicy = cloudv1.DeletionTerminate
 	})
 	h := newHarness(t, credentialSecret(), readyAccount(), cluster)
 	h.reconcileAccount(testAccountName)
@@ -429,9 +429,9 @@ func TestDeletingAnAccountTogetherWithItsClustersFinishes(t *testing.T) {
 	}
 	h.reconcileAccount(testAccountName)
 
-	held := condition(t, &v1alpha1.CloudCluster{Status: v1alpha1.CloudClusterStatus{
-		Conditions: h.getAccount(testAccountName).Status.Conditions}}, v1alpha1.ConditionReady)
-	if held.Reason != v1alpha1.ReasonInUse {
+	held := condition(t, &cloudv1.CloudCluster{Status: cloudv1.CloudClusterStatus{
+		Conditions: h.getAccount(testAccountName).Status.Conditions}}, cloudv1.ConditionReady)
+	if held.Reason != cloudv1.ReasonInUse {
 		t.Fatalf("account Ready reason = %q, want InUse while the cluster holds it", held.Reason)
 	}
 
@@ -439,12 +439,12 @@ func TestDeletingAnAccountTogetherWithItsClustersFinishes(t *testing.T) {
 	if got := h.cloud.CallCount("TerminateCluster"); got != 1 {
 		t.Fatalf("TerminateCluster called %d times: the cluster is waiting for an account that is waiting for it", got)
 	}
-	if err := h.k8s.Get(ctx, types.NamespacedName{Namespace: testNamespace, Name: "orders"}, &v1alpha1.CloudCluster{}); !apierrors.IsNotFound(err) {
+	if err := h.k8s.Get(ctx, types.NamespacedName{Namespace: testNamespace, Name: "orders"}, &cloudv1.CloudCluster{}); !apierrors.IsNotFound(err) {
 		t.Fatalf("the cluster is still there after terminating: %v", err)
 	}
 
 	h.reconcileAccount(testAccountName)
-	var account v1alpha1.CloudAccount
+	var account cloudv1.CloudAccount
 	err := h.k8s.Get(ctx, types.NamespacedName{Namespace: testNamespace, Name: testAccountName}, &account)
 	if err == nil && hasFinalizer(&account) {
 		t.Error("the account is still held after its last cluster went")
@@ -478,13 +478,13 @@ func TestAFailedCatalogueRefreshIsRetriedSoon(t *testing.T) {
 // a problem lasts is an API write per object every five minutes, and buries
 // the one line saying when it began. The condition carries it from then on.
 func TestAWarningMarksWhenAProblemStarts(t *testing.T) {
-	cluster := provisionCluster("orders", func(c *v1alpha1.CloudCluster) { c.Spec.Region = "mars-north-1" })
+	cluster := provisionCluster("orders", func(c *cloudv1.CloudCluster) { c.Spec.Region = "mars-north-1" })
 	h := newHarness(t, credentialSecret(), readyAccount(), cluster)
 
 	for range 4 {
 		h.reconcileCluster("orders")
 	}
-	if n := countContaining(h.events(), v1alpha1.ReasonInvalidSpec); n != 1 {
+	if n := countContaining(h.events(), cloudv1.ReasonInvalidSpec); n != 1 {
 		t.Errorf("%d InvalidSpec warnings over three polls of the same problem, want 1", n)
 	}
 }
@@ -503,10 +503,10 @@ func TestRetainSaysRetained(t *testing.T) {
 	h.reconcileCluster("orders")
 
 	events := h.events()
-	if countContaining(events, v1alpha1.EventRetained) != 1 {
+	if countContaining(events, cloudv1.EventRetained) != 1 {
 		t.Errorf("no Retained event among %q", events)
 	}
-	if countContaining(events, v1alpha1.EventTerminating) != 0 {
+	if countContaining(events, cloudv1.EventTerminating) != 0 {
 		t.Errorf("an event says Terminating about a cluster left running: %q", events)
 	}
 }
@@ -529,7 +529,7 @@ func TestAnActiveClusterWithNoAddressesPublishesNothing(t *testing.T) {
 	if _, err := h.cluster.reportSecretFailure(context.Background(), cluster, err); err != nil {
 		t.Errorf("the same answer comes back next time, so it must not be handed back to retry: %v", err)
 	}
-	if ready := condition(t, cluster, v1alpha1.ConditionReady); ready.Reason != v1alpha1.ReasonUnexpectedResponse {
+	if ready := condition(t, cluster, cloudv1.ConditionReady); ready.Reason != cloudv1.ReasonUnexpectedResponse {
 		t.Errorf("Ready = %s %s, want UnexpectedResponse", ready.Status, ready.Reason)
 	}
 	if after := h.getSecret(cluster.ConnectionSecretName()).Data[secretKeyURL]; string(after) != string(before) || len(after) == 0 {
@@ -568,7 +568,7 @@ func TestAFailingObjectIsNeverLeftLongerThanAPoll(t *testing.T) {
 	if wait != maxRetryBackoff {
 		t.Errorf("after 40 failures the wait is %v, want the ceiling %v", wait, maxRetryBackoff)
 	}
-	if poll := (&v1alpha1.CloudCluster{}).EffectivePollInterval(); maxRetryBackoff > poll {
+	if poll := (&cloudv1.CloudCluster{}).EffectivePollInterval(); maxRetryBackoff > poll {
 		t.Errorf("a failing object waits up to %v, longer than the %v a healthy one is polled at", maxRetryBackoff, poll)
 	}
 
@@ -625,7 +625,7 @@ func TestParallelReconcilesDoNotRace(t *testing.T) {
 	for _, name := range names {
 		cluster := h.getCluster(name)
 		if !cluster.IsRunning() {
-			t.Errorf("%s: %q, want Running", name, conditionReason(cluster.Status.Conditions, v1alpha1.ConditionReady))
+			t.Errorf("%s: %q, want Running", name, conditionReason(cluster.Status.Conditions, cloudv1.ConditionReady))
 		}
 		if other, taken := seen[cluster.Status.ProductID]; taken {
 			t.Errorf("%s and %s are bound to the same cluster %s", name, other, cluster.Status.ProductID)
@@ -657,8 +657,8 @@ func TestOwnSecretWritesDoNotStartAnotherPass(t *testing.T) {
 // its account and then what the deletion waits for would be two transitions
 // and two log lines on every pass it stays stuck.
 func TestADeletionStuckOnItsAccountLogsOnce(t *testing.T) {
-	cluster := provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.DeletionPolicy = v1alpha1.DeletionTerminate
+	cluster := provisionCluster("orders", func(c *cloudv1.CloudCluster) {
+		c.Spec.DeletionPolicy = cloudv1.DeletionTerminate
 	})
 	h := newHarness(t, credentialSecret(), readyAccount(), cluster)
 	h.reconcileClusterUntilSettled("orders", 6)
@@ -682,7 +682,7 @@ func TestADeletionStuckOnItsAccountLogsOnce(t *testing.T) {
 		}
 	}
 
-	if got := condition(t, h.getCluster("orders"), v1alpha1.ConditionReady).Reason; got != v1alpha1.ReasonDeleting {
+	if got := condition(t, h.getCluster("orders"), cloudv1.ConditionReady).Reason; got != cloudv1.ReasonDeleting {
 		t.Errorf("Ready = %q, want Deleting", got)
 	}
 	transitions := 0
@@ -722,8 +722,8 @@ func TestAddingTheFinalizerNeverDropsAnotherControllers(t *testing.T) {
 // must still be terminated, with the key the operator already holds.
 func TestTerminateSurvivesTheKeySecretGoingFirst(t *testing.T) {
 	ctx := context.Background()
-	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.DeletionPolicy = v1alpha1.DeletionTerminate
+	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *cloudv1.CloudCluster) {
+		c.Spec.DeletionPolicy = cloudv1.DeletionTerminate
 	}))
 	h.reconcileClusterUntilSettled("orders", 6)
 
@@ -738,7 +738,7 @@ func TestTerminateSurvivesTheKeySecretGoingFirst(t *testing.T) {
 	if n := h.cloud.CallCount("TerminateCluster"); n != 1 {
 		t.Errorf("TerminateCluster called %d times, want once", n)
 	}
-	var left v1alpha1.CloudCluster
+	var left cloudv1.CloudCluster
 	if err := h.k8s.Get(ctx, types.NamespacedName{Namespace: testNamespace, Name: "orders"}, &left); !apierrors.IsNotFound(err) {
 		t.Errorf("the object is still there (%v); its deletion hangs on a Secret that is gone", err)
 	}
@@ -750,8 +750,8 @@ func TestTerminateSurvivesTheKeySecretGoingFirst(t *testing.T) {
 // again, which in a namespace being deleted it never is.
 func TestTerminateSurvivesTheAccountNoticingTheMissingKeyFirst(t *testing.T) {
 	ctx := context.Background()
-	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.DeletionPolicy = v1alpha1.DeletionTerminate
+	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *cloudv1.CloudCluster) {
+		c.Spec.DeletionPolicy = cloudv1.DeletionTerminate
 	}))
 	h.reconcileAccount(testAccountName)
 	h.reconcileClusterUntilSettled("orders", 6)
@@ -760,7 +760,7 @@ func TestTerminateSurvivesTheAccountNoticingTheMissingKeyFirst(t *testing.T) {
 		t.Fatalf("deleting the Secret: %v", err)
 	}
 	h.reconcileAccount(testAccountName)
-	if got := h.getAccount(testAccountName); meta.IsStatusConditionTrue(got.Status.Conditions, v1alpha1.ConditionReady) {
+	if got := h.getAccount(testAccountName); meta.IsStatusConditionTrue(got.Status.Conditions, cloudv1.ConditionReady) {
 		t.Fatal("the account is still Ready without its key, so this test is not exercising the teardown order")
 	}
 	h.deleteAccount(testAccountName)
@@ -773,7 +773,7 @@ func TestTerminateSurvivesTheAccountNoticingTheMissingKeyFirst(t *testing.T) {
 	if n := h.cloud.CallCount("TerminateCluster"); n != 1 {
 		t.Errorf("TerminateCluster called %d times, want once", n)
 	}
-	var left v1alpha1.CloudCluster
+	var left cloudv1.CloudCluster
 	if err := h.k8s.Get(ctx, types.NamespacedName{Namespace: testNamespace, Name: "orders"}, &left); !apierrors.IsNotFound(err) {
 		t.Errorf("the object is still there (%v); it waits for an account that is being deleted", err)
 	}
@@ -785,8 +785,8 @@ func TestTerminateSurvivesTheAccountNoticingTheMissingKeyFirst(t *testing.T) {
 // to terminate. It was still running, and billed, in its own account.
 func TestAKeyForAnotherAccountLeavesTheClusterAlone(t *testing.T) {
 	ctx := context.Background()
-	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.DeletionPolicy = v1alpha1.DeletionTerminate
+	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *cloudv1.CloudCluster) {
+		c.Spec.DeletionPolicy = cloudv1.DeletionTerminate
 	}))
 	h.reconcileClusterUntilSettled("orders", 6)
 	if got := h.getCluster("orders").Status.AccountDomain; got != "example.ravendb.cloud" {
@@ -805,8 +805,8 @@ func TestAKeyForAnotherAccountLeavesTheClusterAlone(t *testing.T) {
 	if n := h.cloud.CallCount("GetCluster"); n != reads {
 		t.Errorf("read the cluster %d time(s) with a key for another account", n-reads)
 	}
-	ready := condition(t, h.getCluster("orders"), v1alpha1.ConditionReady)
-	if ready.Reason != v1alpha1.ReasonWaitingForAccount || !strings.Contains(ready.Message, "elsewhere.ravendb.cloud") {
+	ready := condition(t, h.getCluster("orders"), cloudv1.ConditionReady)
+	if ready.Reason != cloudv1.ReasonWaitingForAccount || !strings.Contains(ready.Message, "elsewhere.ravendb.cloud") {
 		t.Errorf("Ready = %s %q, want WaitingForAccount naming the other account", ready.Reason, ready.Message)
 	}
 
@@ -817,7 +817,7 @@ func TestAKeyForAnotherAccountLeavesTheClusterAlone(t *testing.T) {
 	if n := h.cloud.CallCount("TerminateCluster"); n != 0 {
 		t.Errorf("sent %d terminate(s) through a key for another account", n)
 	}
-	if got := condition(t, h.getCluster("orders"), v1alpha1.ConditionReady).Reason; got != v1alpha1.ReasonDeleting {
+	if got := condition(t, h.getCluster("orders"), cloudv1.ConditionReady).Reason; got != cloudv1.ReasonDeleting {
 		t.Errorf("Ready = %q, want Deleting while the keys differ", got)
 	}
 }
@@ -834,8 +834,8 @@ func TestARefusedTerminateWaitsAndARejectedKeyPolls(t *testing.T) {
 		{http.StatusUnauthorized, 5 * time.Minute},
 	} {
 		t.Run(http.StatusText(tc.status), func(t *testing.T) {
-			h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
-				c.Spec.DeletionPolicy = v1alpha1.DeletionTerminate
+			h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *cloudv1.CloudCluster) {
+				c.Spec.DeletionPolicy = cloudv1.DeletionTerminate
 			}))
 			h.reconcileClusterUntilSettled("orders", 6)
 			if err := h.k8s.Delete(context.Background(), h.getCluster("orders")); err != nil {
@@ -847,7 +847,7 @@ func TestARefusedTerminateWaitsAndARejectedKeyPolls(t *testing.T) {
 			if result.RequeueAfter != tc.want {
 				t.Errorf("RequeueAfter = %v, want %v", result.RequeueAfter, tc.want)
 			}
-			if got := condition(t, h.getCluster("orders"), v1alpha1.ConditionReady).Reason; got != v1alpha1.ReasonDeleting {
+			if got := condition(t, h.getCluster("orders"), cloudv1.ConditionReady).Reason; got != cloudv1.ReasonDeleting {
 				t.Errorf("Ready = %q, want Deleting", got)
 			}
 		})

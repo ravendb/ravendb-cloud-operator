@@ -26,12 +26,12 @@ The labs and `make test-e2e` also need `kubectl` and
 | `make test-chart-install` | the Helm chart installed into that cluster, scoped to one namespace | minutes |
 | `make test-e2e-cloud` | read-only requests against a real RavenDB Cloud account; needs a key | a minute |
 | `make lint` | golangci-lint, as CI runs it | seconds |
-| `make generate manifests` | deepcopy, CRDs and RBAC from the markers; run after touching `api/v1alpha1/` | seconds |
+| `make generate manifests` | deepcopy, CRDs and RBAC from the markers; run after touching `api/v1/` | seconds |
 | `make chart-sync`, `make chart-lint` | copy the generated CRDs and RBAC into the chart; check it matches, lints and renders | seconds |
 | `make build`, `make docker-build` | the manager and the kubectl plugin into `bin/`; the image | seconds |
 | `make deploy`, `make hooks` | CRDs, RBAC and the manager via kustomize; the pre-commit checks | seconds |
 
-`api/v1alpha1` reports `ok` with every test skipped when the envtest binaries are
+`api/v1` reports `ok` with every test skipped when the envtest binaries are
 absent, so `make test-unit` says so out loud; run `make test-integration` to
 actually exercise the CRDs.
 
@@ -47,7 +47,7 @@ is damaged. `./hack/go.sh go clean -cache` empties it.
 A field reaches a lot of places, and nothing but this list and the tests makes
 sure it reaches all of them.
 
-1. **The type**, in `api/v1alpha1/cloudcluster_types.go`, with a generous doc
+1. **The type**, in `api/v1/cloudcluster_types.go`, with a generous doc
    comment: it is what `kubectl explain` shows. Validation that needs only the
    object goes here as markers or CEL, with a case in
    `crd_validation_test.go`. [validation-and-defaults.md](docs/how-it-works/validation-and-defaults.md)
@@ -81,7 +81,7 @@ sure it reaches all of them.
 
 ## Adding a condition reason
 
-Add the constant in `api/v1alpha1` beside the others for that condition, add it
+Add the constant in `api/v1` beside the others for that condition, add it
 to its table in `internal/controller/conditions.go`, which decides its status,
 its event and whether it stalls, and document it in the condition's comment on
 the status type. Set it through `ready`, `synced` or `complete`, never directly.

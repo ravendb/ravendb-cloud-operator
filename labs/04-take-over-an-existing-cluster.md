@@ -14,7 +14,7 @@ The script first seeds a three node `PB10` cluster in the simulator, called `lab
 and a tier are enough:
 
 ```yaml
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: lab04-legacy-wi5o      # the cluster's name in RavenDB Cloud

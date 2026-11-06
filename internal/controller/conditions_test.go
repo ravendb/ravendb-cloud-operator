@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 )
 
 // drain returns every event recorded so far.
@@ -35,7 +35,7 @@ func drain(recorder *events.FakeRecorder) []string {
 func TestAProblemWarnsOnceWhenItStarts(t *testing.T) {
 	recorder := events.NewFakeRecorder(20)
 	r := &CloudClusterReconciler{Recorder: recorder}
-	cluster := &v1alpha1.CloudCluster{}
+	cluster := &cloudv1.CloudCluster{}
 	cluster.Generation = 1
 	ctx := context.Background()
 
@@ -46,12 +46,12 @@ func TestAProblemWarnsOnceWhenItStarts(t *testing.T) {
 		message    string
 		warns      bool
 	}{
-		{"a problem starts", 1, v1alpha1.ReasonInvalidSpec, "region is wrong", true},
-		{"the next poll says the same", 1, v1alpha1.ReasonInvalidSpec, "region is wrong", false},
-		{"the wording moves on its own", 1, v1alpha1.ReasonInvalidSpec, "region is still wrong", false},
-		{"a spec edit meets a new problem", 2, v1alpha1.ReasonInvalidSpec, "instance type is wrong", true},
-		{"it is fixed", 2, v1alpha1.ReasonCreating, "creating", false},
-		{"another problem starts", 2, v1alpha1.ReasonCloudUnreachable, "no answer", true},
+		{"a problem starts", 1, cloudv1.ReasonInvalidSpec, "region is wrong", true},
+		{"the next poll says the same", 1, cloudv1.ReasonInvalidSpec, "region is wrong", false},
+		{"the wording moves on its own", 1, cloudv1.ReasonInvalidSpec, "region is still wrong", false},
+		{"a spec edit meets a new problem", 2, cloudv1.ReasonInvalidSpec, "instance type is wrong", true},
+		{"it is fixed", 2, cloudv1.ReasonCreating, "creating", false},
+		{"another problem starts", 2, cloudv1.ReasonCloudUnreachable, "no answer", true},
 	}
 	for _, step := range steps {
 		cluster.Generation = step.generation
@@ -76,10 +76,10 @@ func TestATransitionIsLoggedFromWhereItWas(t *testing.T) {
 	logger := funcr.New(func(prefix, args string) { lines = append(lines, args) }, funcr.Options{})
 	ctx := log.IntoContext(context.Background(), logger)
 	r := &CloudClusterReconciler{}
-	cluster := &v1alpha1.CloudCluster{}
+	cluster := &cloudv1.CloudCluster{}
 
-	r.ready(ctx, cluster, v1alpha1.ReasonCreating, "creating")
-	r.ready(ctx, cluster, v1alpha1.ReasonRunning, "running")
+	r.ready(ctx, cluster, cloudv1.ReasonCreating, "creating")
+	r.ready(ctx, cluster, cloudv1.ReasonRunning, "running")
 
 	want := []string{
 		`"condition"="Ready" "from"="none" "to"="Creating"`,
@@ -100,17 +100,17 @@ func TestATransitionIsLoggedFromWhereItWas(t *testing.T) {
 func TestAReasonCarriesItsStatus(t *testing.T) {
 	r := &CloudClusterReconciler{}
 	for reason, want := range map[string]metav1.ConditionStatus{
-		v1alpha1.ReasonRunning:            metav1.ConditionTrue,
-		v1alpha1.ReasonCreating:           metav1.ConditionFalse,
-		v1alpha1.ReasonDeletedInCloud:     metav1.ConditionFalse,
-		v1alpha1.ReasonCloudUnreachable:   metav1.ConditionUnknown,
-		v1alpha1.ReasonUnexpectedResponse: metav1.ConditionUnknown,
+		cloudv1.ReasonRunning:            metav1.ConditionTrue,
+		cloudv1.ReasonCreating:           metav1.ConditionFalse,
+		cloudv1.ReasonDeletedInCloud:     metav1.ConditionFalse,
+		cloudv1.ReasonCloudUnreachable:   metav1.ConditionUnknown,
+		cloudv1.ReasonUnexpectedResponse: metav1.ConditionUnknown,
 		// Not in the table: a bug here, and Unknown is the honest status.
 		"SomethingNobodyAdded": metav1.ConditionUnknown,
 	} {
-		cluster := &v1alpha1.CloudCluster{}
+		cluster := &cloudv1.CloudCluster{}
 		r.ready(context.Background(), cluster, reason, "m")
-		if got := meta.FindStatusCondition(cluster.Status.Conditions, v1alpha1.ConditionReady).Status; got != want {
+		if got := meta.FindStatusCondition(cluster.Status.Conditions, cloudv1.ConditionReady).Status; got != want {
 			t.Errorf("%s: Ready = %s, want %s", reason, got, want)
 		}
 	}
@@ -122,16 +122,16 @@ func TestAReasonCarriesItsStatus(t *testing.T) {
 func TestInUseKeepsTheStatusItFound(t *testing.T) {
 	r := &CloudAccountReconciler{}
 	for _, before := range []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionFalse} {
-		account := &v1alpha1.CloudAccount{}
+		account := &cloudv1.CloudAccount{}
 		meta.SetStatusCondition(&account.Status.Conditions, metav1.Condition{
-			Type:               v1alpha1.ConditionReady,
+			Type:               cloudv1.ConditionReady,
 			Status:             before,
-			Reason:             v1alpha1.ReasonVerified,
+			Reason:             cloudv1.ReasonVerified,
 			Message:            "m",
 			ObservedGeneration: 0,
 		})
-		r.ready(context.Background(), account, v1alpha1.ReasonInUse, "held")
-		if got := meta.FindStatusCondition(account.Status.Conditions, v1alpha1.ConditionReady).Status; got != before {
+		r.ready(context.Background(), account, cloudv1.ReasonInUse, "held")
+		if got := meta.FindStatusCondition(account.Status.Conditions, cloudv1.ConditionReady).Status; got != before {
 			t.Errorf("InUse over %s gave %s", before, got)
 		}
 	}
@@ -158,7 +158,7 @@ func TestEveryTableIsClosed(t *testing.T) {
 		}
 	}
 	// Words both kinds use for the same problem.
-	for _, reason := range []string{v1alpha1.ReasonKeyRejected, v1alpha1.ReasonCloudUnreachable, v1alpha1.ReasonUnexpectedResponse} {
+	for _, reason := range []string{cloudv1.ReasonKeyRejected, cloudv1.ReasonCloudUnreachable, cloudv1.ReasonUnexpectedResponse} {
 		if clusterReady[reason].event != corev1Warning || accountReady[reason].event != corev1Warning {
 			t.Errorf("%s warns on one kind and not the other", reason)
 		}

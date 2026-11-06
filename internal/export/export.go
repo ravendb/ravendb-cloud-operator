@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"sigs.k8s.io/yaml"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 )
 
@@ -104,10 +104,10 @@ func render(to Target, clusters []*cloudapi.Cluster) ([]byte, error) {
 // type itself would render an empty status and a null creationTimestamp, which
 // are noise in a file somebody commits.
 type manifest struct {
-	APIVersion string                    `json:"apiVersion"`
-	Kind       string                    `json:"kind"`
-	Metadata   metadata                  `json:"metadata"`
-	Spec       v1alpha1.CloudClusterSpec `json:"spec"`
+	APIVersion string                   `json:"apiVersion"`
+	Kind       string                   `json:"kind"`
+	Metadata   metadata                 `json:"metadata"`
+	Spec       cloudv1.CloudClusterSpec `json:"spec"`
 }
 
 type metadata struct {
@@ -125,29 +125,29 @@ type metadata struct {
 func manifestFor(to Target, cluster *cloudapi.Cluster) manifest {
 	nodes := cluster.NodeCount()
 	disk := cluster.Hardware.Storage
-	spec := v1alpha1.CloudClusterSpec{
-		AccountRef:     v1alpha1.LocalObjectReference{Name: to.Account},
+	spec := cloudv1.CloudClusterSpec{
+		AccountRef:     cloudv1.LocalObjectReference{Name: to.Account},
 		DisplayName:    cluster.DisplayName,
-		Tier:           v1alpha1.Tier(cluster.Tier),
-		Provider:       v1alpha1.Provider(cluster.Provider),
+		Tier:           cloudv1.Tier(cluster.Tier),
+		Provider:       cloudv1.Provider(cluster.Provider),
 		Region:         cluster.Region,
 		InstanceType:   cluster.InstanceType,
 		ReleaseChannel: cluster.ReleaseChannel,
 		Nodes:          &nodes,
-		Storage: v1alpha1.StorageSpec{
+		Storage: cloudv1.StorageSpec{
 			SizeGB:         disk.SizeGiB,
-			Type:           v1alpha1.StorageType(disk.Type),
+			Type:           cloudv1.StorageType(disk.Type),
 			IOPS:           disk.IOPS,
 			ThroughputMBps: wholeMBps(disk.ThroughputMBps),
 		},
-		Networking:       v1alpha1.NetworkingSpec{AllowedIPs: cluster.AllowedIPs},
-		ManagementPolicy: v1alpha1.ManagementFull,
+		Networking:       cloudv1.NetworkingSpec{AllowedIPs: cluster.AllowedIPs},
+		ManagementPolicy: cloudv1.ManagementFull,
 		// The cluster exists, so applying this again must never create one in
 		// its place.
-		CreationMode: v1alpha1.CreationTakeOverOnly,
+		CreationMode: cloudv1.CreationTakeOverOnly,
 	}
 	return manifest{
-		APIVersion: v1alpha1.GroupVersion.String(),
+		APIVersion: cloudv1.GroupVersion.String(),
 		Kind:       "CloudCluster",
 		Metadata:   metadata{Name: objectName(cluster.DisplayName), Namespace: to.Namespace},
 		Spec:       spec,

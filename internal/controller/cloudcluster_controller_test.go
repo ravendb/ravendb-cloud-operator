@@ -13,7 +13,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/yaml"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudsim"
 	"github.com/ravendb/ravendb-cloud-operator/internal/export"
@@ -33,7 +33,7 @@ func TestProvisionCreatesClusterAndPublishesConnectionSecret(t *testing.T) {
 
 	if !cluster.IsRunning() {
 		t.Fatalf("Ready = %q, want Running (conditions: %+v)",
-			conditionReason(cluster.Status.Conditions, v1alpha1.ConditionReady), cluster.Status.Conditions)
+			conditionReason(cluster.Status.Conditions, cloudv1.ConditionReady), cluster.Status.Conditions)
 	}
 	if h.cloud.CallCount("CreateCluster") != 1 {
 		t.Errorf("CreateCluster called %d times, want exactly 1", h.cloud.CallCount("CreateCluster"))
@@ -44,17 +44,17 @@ func TestProvisionCreatesClusterAndPublishesConnectionSecret(t *testing.T) {
 	if cluster.Status.Adopted {
 		t.Error("a cluster this object created must not be marked adopted")
 	}
-	if cluster.Status.ManagementPolicy != v1alpha1.ManagementFull {
+	if cluster.Status.ManagementPolicy != cloudv1.ManagementFull {
 		t.Errorf("managementPolicy = %q, want Full by default for a created cluster", cluster.Status.ManagementPolicy)
 	}
 	// Running means published too, so the message has to say where.
-	if cond := meta.FindStatusCondition(cluster.Status.Conditions, v1alpha1.ConditionReady); !contains(cond.Message, "orders-connection") {
+	if cond := meta.FindStatusCondition(cluster.Status.Conditions, cloudv1.ConditionReady); !contains(cond.Message, "orders-connection") {
 		t.Errorf("Ready message %q does not name the Secret", cond.Message)
 	}
-	if got := conditionReason(cluster.Status.Conditions, v1alpha1.ConditionSynced); got != v1alpha1.ReasonApplied {
+	if got := conditionReason(cluster.Status.Conditions, cloudv1.ConditionSynced); got != cloudv1.ReasonApplied {
 		t.Errorf("Synced = %q, want Applied", got)
 	}
-	if !h.hasEvent(v1alpha1.EventCreated) {
+	if !h.hasEvent(cloudv1.EventCreated) {
 		t.Error("expected a Created event")
 	}
 
@@ -69,7 +69,7 @@ func TestProvisionCreatesClusterAndPublishesConnectionSecret(t *testing.T) {
 }
 
 func TestProvisionDefaultsInstanceTypeFromTier(t *testing.T) {
-	cluster := provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
+	cluster := provisionCluster("orders", func(c *cloudv1.CloudCluster) {
 		c.Spec.InstanceType = "" // let the operator choose
 	})
 	h := newHarness(t, credentialSecret(), readyAccount(), cluster)
@@ -84,7 +84,7 @@ func TestProvisionDefaultsInstanceTypeFromTier(t *testing.T) {
 }
 
 func TestProvisionRejectsUnavailableRegionWithoutCallingCreate(t *testing.T) {
-	cluster := provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
+	cluster := provisionCluster("orders", func(c *cloudv1.CloudCluster) {
 		c.Spec.Region = "moon-base-1"
 	})
 	h := newHarness(t, credentialSecret(), readyAccount(), cluster)
@@ -96,8 +96,8 @@ func TestProvisionRejectsUnavailableRegionWithoutCallingCreate(t *testing.T) {
 	if h.cloud.CallCount("CreateCluster") != 0 {
 		t.Error("a region that is not in the cached list must be rejected before calling the cloud API")
 	}
-	cond := meta.FindStatusCondition(settled.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonInvalidSpec {
+	cond := meta.FindStatusCondition(settled.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonInvalidSpec {
 		t.Fatalf("Ready condition = %+v, want reason InvalidSpec", cond)
 	}
 	// The message should tell the user what they could have written instead.
@@ -136,7 +136,7 @@ func TestProvisionRecoversFromCrashBetweenCreateAndStatusWrite(t *testing.T) {
 	}
 	// This object made it, so it is managed as one it made: Full, not the
 	// Observe a found cluster starts in.
-	if settled.Status.Adopted || settled.Status.ManagementPolicy != v1alpha1.ManagementFull {
+	if settled.Status.Adopted || settled.Status.ManagementPolicy != cloudv1.ManagementFull {
 		t.Errorf("adopted = %v, policy = %q; a recovered create is this object's own and runs Full",
 			settled.Status.Adopted, settled.Status.ManagementPolicy)
 	}
@@ -164,17 +164,17 @@ func TestAManifestTakesOverTheClusterItsNameFinds(t *testing.T) {
 		t.Error("status.adopted should be true for a cluster this object found")
 	}
 	if !settled.IsRunning() {
-		t.Errorf("Ready = %q, want Running", conditionReason(settled.Status.Conditions, v1alpha1.ConditionReady))
+		t.Errorf("Ready = %q, want Running", conditionReason(settled.Status.Conditions, cloudv1.ConditionReady))
 	}
 	// A found cluster starts read-only, so taking it over reshapes nothing.
-	if settled.Status.ManagementPolicy != v1alpha1.ManagementObserve {
+	if settled.Status.ManagementPolicy != cloudv1.ManagementObserve {
 		t.Errorf("managementPolicy = %q, want Observe by default for a found cluster", settled.Status.ManagementPolicy)
 	}
 	// A manifest that names only the tier asks for nothing that could differ.
-	if got := conditionReason(settled.Status.Conditions, v1alpha1.ConditionSynced); got != v1alpha1.ReasonApplied {
+	if got := conditionReason(settled.Status.Conditions, cloudv1.ConditionSynced); got != cloudv1.ReasonApplied {
 		t.Errorf("Synced = %q, want Applied: the manifest sets nothing the cluster does not have", got)
 	}
-	if !h.hasEvent(v1alpha1.EventAdopted) {
+	if !h.hasEvent(cloudv1.EventAdopted) {
 		t.Error("expected an Adopted event saying the cluster was found")
 	}
 	// Connectivity is what taking a cluster over delivers first.
@@ -204,7 +204,7 @@ func TestAnExportedManifestTakesOverWithoutChangingAnything(t *testing.T) {
 	if err != nil {
 		t.Fatalf("exporting: %v", err)
 	}
-	var cluster v1alpha1.CloudCluster
+	var cluster cloudv1.CloudCluster
 	if err := yaml.Unmarshal(out, &cluster); err != nil {
 		t.Fatalf("the export does not parse as a CloudCluster: %v\n%s", err, out)
 	}
@@ -217,10 +217,10 @@ func TestAnExportedManifestTakesOverWithoutChangingAnything(t *testing.T) {
 	if settled.Status.ProductID != seeded.ID {
 		t.Fatalf("productID = %q, want the exported cluster %q", settled.Status.ProductID, seeded.ID)
 	}
-	if settled.Status.ManagementPolicy != v1alpha1.ManagementFull {
+	if settled.Status.ManagementPolicy != cloudv1.ManagementFull {
 		t.Errorf("managementPolicy = %q, want the Full the export wrote", settled.Status.ManagementPolicy)
 	}
-	if got := conditionReason(settled.Status.Conditions, v1alpha1.ConditionSynced); got != v1alpha1.ReasonApplied {
+	if got := conditionReason(settled.Status.Conditions, cloudv1.ConditionSynced); got != cloudv1.ReasonApplied {
 		t.Errorf("Synced = %q, want Applied: the export describes exactly what runs", got)
 	}
 	for _, change := range []string{"CreateCluster", "ChangeInstanceType", "ChangeStorage", "AddNode", "RemoveNode"} {
@@ -234,7 +234,7 @@ func TestAnExportedManifestTakesOverWithoutChangingAnything(t *testing.T) {
 // stands in for Atlas's export step. A hand-written manifest that gets a field
 // wrong reports the difference first, and only Full carries it through.
 func TestAFoundClusterIsNotReshapedUntilThePolicySaysSo(t *testing.T) {
-	h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("legacy-prod", func(c *v1alpha1.CloudCluster) {
+	h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("legacy-prod", func(c *cloudv1.CloudCluster) {
 		c.Spec.InstanceType = "PB20" // the seeded cluster is PB10
 	}))
 	h.seedCloudCluster(cloudsim.SeedSpec{DisplayName: "legacy-prod"})
@@ -244,8 +244,8 @@ func TestAFoundClusterIsNotReshapedUntilThePolicySaysSo(t *testing.T) {
 	if h.cloud.CallCount("ChangeInstanceType") != 0 {
 		t.Fatal("a found cluster must not be reshaped while the policy is the default Observe")
 	}
-	cond := meta.FindStatusCondition(settled.Status.Conditions, v1alpha1.ConditionSynced)
-	if cond == nil || cond.Reason != v1alpha1.ReasonNotApplied {
+	cond := meta.FindStatusCondition(settled.Status.Conditions, cloudv1.ConditionSynced)
+	if cond == nil || cond.Reason != cloudv1.ReasonNotApplied {
 		t.Fatalf("Synced = %+v, want NotApplied", cond)
 	}
 	if !contains(cond.Message, "instanceType differs") ||
@@ -253,8 +253,8 @@ func TestAFoundClusterIsNotReshapedUntilThePolicySaysSo(t *testing.T) {
 		t.Errorf("message %q should name the difference and the way to apply it", cond.Message)
 	}
 
-	settled.Spec.CreationMode = v1alpha1.CreationTakeOverOnly
-	settled.Spec.ManagementPolicy = v1alpha1.ManagementFull
+	settled.Spec.CreationMode = cloudv1.CreationTakeOverOnly
+	settled.Spec.ManagementPolicy = cloudv1.ManagementFull
 	if err := h.k8s.Update(context.Background(), settled); err != nil {
 		t.Fatalf("updating spec: %v", err)
 	}
@@ -270,8 +270,8 @@ func TestAFoundClusterIsNotReshapedUntilThePolicySaysSo(t *testing.T) {
 // share its name. Tier cannot change, so a different tier means the name is
 // somebody else's cluster, not this manifest's.
 func TestANameOnAnotherKindOfClusterIsNotTakenOver(t *testing.T) {
-	h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.Tier = v1alpha1.TierDevelopment
+	h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("orders", func(c *cloudv1.CloudCluster) {
+		c.Spec.Tier = cloudv1.TierDevelopment
 	}))
 	h.seedCloudCluster(cloudsim.SeedSpec{DisplayName: "orders"}) // Production
 
@@ -285,8 +285,8 @@ func TestANameOnAnotherKindOfClusterIsNotTakenOver(t *testing.T) {
 	if h.cloud.CallCount("CreateCluster") != 0 {
 		t.Error("the name is taken, so asking to create would only be refused")
 	}
-	cond := meta.FindStatusCondition(settled.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonNameTaken {
+	cond := meta.FindStatusCondition(settled.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonNameTaken {
 		t.Fatalf("Ready = %+v, want NameTaken", cond)
 	}
 	if !contains(cond.Message, "Production") || !contains(cond.Message, "displayName") {
@@ -298,7 +298,7 @@ func TestANameOnAnotherKindOfClusterIsNotTakenOver(t *testing.T) {
 // second manifest for the same name would otherwise bind to the same cluster,
 // and two objects applying two specs to one cluster fight forever.
 func TestTwoObjectsCannotManageOneCluster(t *testing.T) {
-	second := takeOverCluster("orders-copy", func(c *v1alpha1.CloudCluster) {
+	second := takeOverCluster("orders-copy", func(c *cloudv1.CloudCluster) {
 		c.Spec.DisplayName = "orders"
 	})
 	h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("orders"), second)
@@ -315,8 +315,8 @@ func TestTwoObjectsCannotManageOneCluster(t *testing.T) {
 	if copied.Status.ProductID != "" {
 		t.Errorf("the second object bound to %q as well", copied.Status.ProductID)
 	}
-	cond := meta.FindStatusCondition(copied.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonNameTaken || !contains(cond.Message, testNamespace+"/orders") {
+	cond := meta.FindStatusCondition(copied.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonNameTaken || !contains(cond.Message, testNamespace+"/orders") {
 		t.Errorf("Ready = %+v, want NameTaken naming the object that holds the cluster", cond)
 	}
 }
@@ -338,7 +338,7 @@ func TestAnAmbiguousNameBindsToNothing(t *testing.T) {
 	if h.cloud.CallCount("CreateCluster") != 0 {
 		t.Error("an ambiguous name must not lead to a third cluster")
 	}
-	if got := conditionReason(settled.Status.Conditions, v1alpha1.ConditionReady); got != v1alpha1.ReasonNameTaken {
+	if got := conditionReason(settled.Status.Conditions, cloudv1.ConditionReady); got != cloudv1.ReasonNameTaken {
 		t.Errorf("Ready reason = %q, want NameTaken", got)
 	}
 }
@@ -347,8 +347,8 @@ func TestAnAmbiguousNameBindsToNothing(t *testing.T) {
 // and creating is a change. A manifest written to consume a cluster that
 // turns out to be misnamed must not order a new, billed one.
 func TestObserveNeverCreatesACluster(t *testing.T) {
-	h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("nope", func(c *v1alpha1.CloudCluster) {
-		c.Spec.ManagementPolicy = v1alpha1.ManagementObserve
+	h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("nope", func(c *cloudv1.CloudCluster) {
+		c.Spec.ManagementPolicy = cloudv1.ManagementObserve
 	}))
 
 	h.reconcileCluster("nope")
@@ -358,8 +358,8 @@ func TestObserveNeverCreatesACluster(t *testing.T) {
 	if h.cloud.CallCount("CreateCluster") != 0 {
 		t.Error("Observe must never create a cluster")
 	}
-	cond := meta.FindStatusCondition(settled.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonClusterNotFound {
+	cond := meta.FindStatusCondition(settled.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonClusterNotFound {
 		t.Fatalf("Ready = %+v, want ClusterNotFound", cond)
 	}
 	// Under TakeOverOrCreate a written Full is refused at admission, so the way
@@ -373,8 +373,8 @@ func TestObserveNeverCreatesACluster(t *testing.T) {
 // product, so a Free manifest waits for one made in the portal, and binds to
 // it once it appears.
 func TestAFreeClusterIsOnlyEverFound(t *testing.T) {
-	h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("sandbox", func(c *v1alpha1.CloudCluster) {
-		c.Spec.Tier = v1alpha1.TierFree
+	h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("sandbox", func(c *cloudv1.CloudCluster) {
+		c.Spec.Tier = cloudv1.TierFree
 	}))
 
 	h.reconcileCluster("sandbox")
@@ -383,8 +383,8 @@ func TestAFreeClusterIsOnlyEverFound(t *testing.T) {
 	if h.cloud.CallCount("CreateCluster") != 0 {
 		t.Fatal("a Free cluster cannot be created through the API, so the operator must not ask")
 	}
-	cond := meta.FindStatusCondition(h.getCluster("sandbox").Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonClusterNotFound || !contains(cond.Message, "portal") {
+	cond := meta.FindStatusCondition(h.getCluster("sandbox").Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonClusterNotFound || !contains(cond.Message, "portal") {
 		t.Fatalf("Ready = %+v, want ClusterNotFound pointing at the portal", cond)
 	}
 
@@ -410,8 +410,8 @@ func TestANameATerminatedClusterHoldsSaysHowToFreeIt(t *testing.T) {
 	h.reconcileCluster("orders")
 	h.reconcileCluster("orders")
 
-	cond := meta.FindStatusCondition(h.getCluster("orders").Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonRefused {
+	cond := meta.FindStatusCondition(h.getCluster("orders").Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonRefused {
 		t.Fatalf("Ready = %+v, want Refused", cond)
 	}
 	if !contains(cond.Message, "spec.displayName") || !contains(cond.Message, "hidden in the RavenDB Cloud portal") {
@@ -422,8 +422,8 @@ func TestANameATerminatedClusterHoldsSaysHowToFreeIt(t *testing.T) {
 // --- Day-2 and policies ----------------------------------------------------
 
 func TestObservePolicyReportsDriftWithoutMutating(t *testing.T) {
-	cluster := provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.ManagementPolicy = v1alpha1.ManagementObserve
+	cluster := provisionCluster("orders", func(c *cloudv1.CloudCluster) {
+		c.Spec.ManagementPolicy = cloudv1.ManagementObserve
 		c.Spec.InstanceType = "PB20"
 	})
 	h := newHarness(t, credentialSecret(), readyAccount(), cluster)
@@ -442,8 +442,8 @@ func TestObservePolicyReportsDriftWithoutMutating(t *testing.T) {
 	if h.cloud.CallCount("ChangeInstanceType") != 0 {
 		t.Error("Observe policy must not mutate the cloud cluster")
 	}
-	cond := meta.FindStatusCondition(settled.Status.Conditions, v1alpha1.ConditionSynced)
-	if cond == nil || cond.Reason != v1alpha1.ReasonNotApplied {
+	cond := meta.FindStatusCondition(settled.Status.Conditions, cloudv1.ConditionSynced)
+	if cond == nil || cond.Reason != cloudv1.ReasonNotApplied {
 		t.Fatalf("Synced condition = %+v, want reason NotApplied", cond)
 	}
 	if !contains(cond.Message, "instanceType differs") {
@@ -477,10 +477,10 @@ func TestFullPolicyResizesStorage(t *testing.T) {
 		t.Errorf("resize to %d GiB, want 75", sent.Size)
 	}
 	settled = h.getCluster("orders")
-	if got := conditionReason(settled.Status.Conditions, v1alpha1.ConditionReady); got != v1alpha1.ReasonUpdating {
+	if got := conditionReason(settled.Status.Conditions, cloudv1.ConditionReady); got != cloudv1.ReasonUpdating {
 		t.Errorf("Ready = %q on the pass that sent a change, want Updating", got)
 	}
-	if !h.hasEvent(v1alpha1.EventApplying) {
+	if !h.hasEvent(cloudv1.EventApplying) {
 		t.Error("expected an Applying event for the change")
 	}
 }
@@ -501,8 +501,8 @@ func TestShrinkingStorageIsRefusedAsDrift(t *testing.T) {
 	if h.cloud.CallCount("ChangeStorage") != 0 {
 		t.Error("the operator must not attempt to shrink a cloud disk")
 	}
-	cond := meta.FindStatusCondition(settled.Status.Conditions, v1alpha1.ConditionSynced)
-	if cond == nil || cond.Reason != v1alpha1.ReasonNotApplied {
+	cond := meta.FindStatusCondition(settled.Status.Conditions, cloudv1.ConditionSynced)
+	if cond == nil || cond.Reason != cloudv1.ReasonNotApplied {
 		t.Fatalf("Synced = %+v, want NotApplied", cond)
 	}
 	if !contains(cond.Message, "10 GB") || !contains(cond.Message, "20 GB") {
@@ -512,9 +512,9 @@ func TestShrinkingStorageIsRefusedAsDrift(t *testing.T) {
 
 // premiumDisk is a created cluster on a Premium disk with dedicated IOPS, the
 // disk an unset storage.type must not be compared against a default.
-func premiumDisk(c *v1alpha1.CloudCluster) {
+func premiumDisk(c *cloudv1.CloudCluster) {
 	iops := int32(3000)
-	c.Spec.Storage = v1alpha1.StorageSpec{SizeGB: 20, Type: v1alpha1.StorageSsdPremium, IOPS: &iops}
+	c.Spec.Storage = cloudv1.StorageSpec{SizeGB: 20, Type: cloudv1.StorageSsdPremium, IOPS: &iops}
 }
 
 func TestAStorageFieldLeftOutIsNotCompared(t *testing.T) {
@@ -522,7 +522,7 @@ func TestAStorageFieldLeftOutIsNotCompared(t *testing.T) {
 	h.reconcileClusterUntilSettled("orders", 6)
 
 	settled := h.getCluster("orders")
-	settled.Spec.Storage = v1alpha1.StorageSpec{SizeGB: 20}
+	settled.Spec.Storage = cloudv1.StorageSpec{SizeGB: 20}
 	if err := h.k8s.Update(context.Background(), settled); err != nil {
 		t.Fatalf("updating spec: %v", err)
 	}
@@ -531,7 +531,7 @@ func TestAStorageFieldLeftOutIsNotCompared(t *testing.T) {
 	if n := h.cloud.CallCount("ChangeStorage"); n != 0 {
 		t.Errorf("ChangeStorage called %d times for a manifest that leaves the disk class out", n)
 	}
-	if got := conditionReason(h.getCluster("orders").Status.Conditions, v1alpha1.ConditionSynced); got != v1alpha1.ReasonApplied {
+	if got := conditionReason(h.getCluster("orders").Status.Conditions, cloudv1.ConditionSynced); got != cloudv1.ReasonApplied {
 		t.Errorf("Synced = %q, want Applied", got)
 	}
 }
@@ -541,7 +541,7 @@ func TestAResizeKeepsTheDiskClassAndIOPSItLeavesOut(t *testing.T) {
 	h.reconcileClusterUntilSettled("orders", 6)
 
 	settled := h.getCluster("orders")
-	settled.Spec.Storage = v1alpha1.StorageSpec{SizeGB: 75}
+	settled.Spec.Storage = cloudv1.StorageSpec{SizeGB: 75}
 	if err := h.k8s.Update(context.Background(), settled); err != nil {
 		t.Fatalf("updating spec: %v", err)
 	}
@@ -564,7 +564,7 @@ func TestStorageFieldsWithoutASizeAreStillApplied(t *testing.T) {
 
 	settled := h.getCluster("orders")
 	iops := int32(3000)
-	settled.Spec.Storage = v1alpha1.StorageSpec{Type: v1alpha1.StorageSsdPremium, IOPS: &iops}
+	settled.Spec.Storage = cloudv1.StorageSpec{Type: cloudv1.StorageSsdPremium, IOPS: &iops}
 	if err := h.k8s.Update(context.Background(), settled); err != nil {
 		t.Fatalf("updating spec: %v", err)
 	}
@@ -582,14 +582,14 @@ func TestStorageFieldsWithoutASizeAreStillApplied(t *testing.T) {
 
 func TestScaleUpAddsOneNodePerPass(t *testing.T) {
 	five := int32(5)
-	cluster := provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
+	cluster := provisionCluster("orders", func(c *cloudv1.CloudCluster) {
 		// Production, and it has to be. Additional nodes are a Production-only
 		// feature and the control plane refuses them anywhere else, so a
 		// Development-tier version of this test would be asserting against an
 		// API that answers 400. PB10 starts at three nodes, which is why the
 		// target here is five rather than three.
 		c.Spec.InstanceType = "PB10"
-		c.Spec.Tier = v1alpha1.TierProduction
+		c.Spec.Tier = cloudv1.TierProduction
 		c.Spec.Nodes = &five
 	})
 	h := newHarness(t, credentialSecret(), readyAccount(), cluster)
@@ -618,8 +618,8 @@ func TestARegionAddedLaterIsReportedWhenItDiffers(t *testing.T) {
 	}
 	h.reconcileCluster("orders")
 
-	cond := meta.FindStatusCondition(h.getCluster("orders").Status.Conditions, v1alpha1.ConditionSynced)
-	if cond == nil || cond.Reason != v1alpha1.ReasonNotApplied || !contains(cond.Message, "region differs") {
+	cond := meta.FindStatusCondition(h.getCluster("orders").Status.Conditions, cloudv1.ConditionSynced)
+	if cond == nil || cond.Reason != cloudv1.ReasonNotApplied || !contains(cond.Message, "region differs") {
 		t.Errorf("Synced = %+v, want NotApplied naming the region", cond)
 	}
 }
@@ -644,7 +644,7 @@ func TestDeleteWithRetainPolicyLeavesCloudClusterRunning(t *testing.T) {
 		t.Error("the cloud cluster disappeared despite deletionPolicy Retain")
 	}
 	// The finalizer must be released, or the object would hang forever.
-	var remaining v1alpha1.CloudClusterList
+	var remaining cloudv1.CloudClusterList
 	if err := h.k8s.List(context.Background(), &remaining); err != nil {
 		t.Fatalf("listing: %v", err)
 	}
@@ -654,8 +654,8 @@ func TestDeleteWithRetainPolicyLeavesCloudClusterRunning(t *testing.T) {
 }
 
 func TestDeleteWithTerminatePolicyDestroysCloudCluster(t *testing.T) {
-	cluster := provisionCluster("scratch", func(c *v1alpha1.CloudCluster) {
-		c.Spec.DeletionPolicy = v1alpha1.DeletionTerminate
+	cluster := provisionCluster("scratch", func(c *cloudv1.CloudCluster) {
+		c.Spec.DeletionPolicy = cloudv1.DeletionTerminate
 	})
 	h := newHarness(t, credentialSecret(), readyAccount(), cluster)
 	h.reconcileClusterUntilSettled("scratch", 6)
@@ -670,7 +670,7 @@ func TestDeleteWithTerminatePolicyDestroysCloudCluster(t *testing.T) {
 	if h.cloud.CallCount("TerminateCluster") != 1 {
 		t.Fatalf("TerminateCluster called %d times, want 1", h.cloud.CallCount("TerminateCluster"))
 	}
-	if !h.hasEvent(v1alpha1.EventTerminating) {
+	if !h.hasEvent(cloudv1.EventTerminating) {
 		t.Error("expected a Terminating event, which outlives the object")
 	}
 	// Terminate is asynchronous: the cluster enters Terminating, and once the
@@ -691,9 +691,9 @@ func TestDeleteWithTerminatePolicyDestroysCloudCluster(t *testing.T) {
 func TestClusterWaitsForAccountToBecomeReady(t *testing.T) {
 	account := readyAccount()
 	account.Status.Conditions = []metav1.Condition{{
-		Type:               v1alpha1.ConditionReady,
+		Type:               cloudv1.ConditionReady,
 		Status:             metav1.ConditionFalse,
-		Reason:             v1alpha1.ReasonKeyMissing,
+		Reason:             cloudv1.ReasonKeyMissing,
 		Message:            "Secret \"ravendb-cloud-api-key\" has no key \"apiKey\"",
 		LastTransitionTime: metav1.Now(),
 	}}
@@ -705,8 +705,8 @@ func TestClusterWaitsForAccountToBecomeReady(t *testing.T) {
 	if h.cloud.CallCount("CreateCluster") != 0 {
 		t.Error("nothing should be created while the account is not Ready")
 	}
-	cond := meta.FindStatusCondition(settled.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonWaitingForAccount {
+	cond := meta.FindStatusCondition(settled.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonWaitingForAccount {
 		t.Fatalf("Ready condition = %+v, want reason WaitingForAccount", cond)
 	}
 	// The account's own error should be quoted, so the user does not have to
@@ -719,14 +719,14 @@ func TestClusterWaitsForAccountToBecomeReady(t *testing.T) {
 // TestAMistypedAccountSaysHowToFixIt: accountRef cannot be edited, so the
 // advice for a name that matches no account has to be the one that works.
 func TestAMistypedAccountSaysHowToFixIt(t *testing.T) {
-	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
+	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *cloudv1.CloudCluster) {
 		c.Spec.AccountRef.Name = "ravendb-clod"
 	}))
 
 	h.reconcileCluster("orders")
 
-	cond := meta.FindStatusCondition(h.getCluster("orders").Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonWaitingForAccount {
+	cond := meta.FindStatusCondition(h.getCluster("orders").Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonWaitingForAccount {
 		t.Fatalf("Ready = %+v, want WaitingForAccount", cond)
 	}
 	if !contains(cond.Message, "spec.accountRef") {
@@ -751,8 +751,8 @@ func TestBoundClusterDeletedInPortalIsReportedNotRecreated(t *testing.T) {
 	if h.cloud.CallCount("CreateCluster") != 1 {
 		t.Error("the operator must not silently re-create a cluster that was deleted out of band")
 	}
-	cond := meta.FindStatusCondition(settled.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonDeletedInCloud {
+	cond := meta.FindStatusCondition(settled.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonDeletedInCloud {
 		t.Fatalf("Ready = %+v, want DeletedInCloud", cond)
 	}
 	if !contains(cond.Message, "Delete this object") {
@@ -772,8 +772,8 @@ func TestAClusterTerminatedInThePortalSaysSo(t *testing.T) {
 	h.cloud.State().Patch(settled.Status.ProductID, "", 0, nil, "Terminated")
 	h.reconcileCluster("orders")
 
-	cond := meta.FindStatusCondition(h.getCluster("orders").Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonDeletedInCloud {
+	cond := meta.FindStatusCondition(h.getCluster("orders").Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonDeletedInCloud {
 		t.Fatalf("Ready = %+v, want DeletedInCloud", cond)
 	}
 	// Applying again would be refused on the name until the old record is
@@ -783,7 +783,7 @@ func TestAClusterTerminatedInThePortalSaysSo(t *testing.T) {
 	}
 	// Nothing is left to compare the manifest with, so CHANGES says nothing
 	// rather than go on claiming Applied.
-	if synced := meta.FindStatusCondition(h.getCluster("orders").Status.Conditions, v1alpha1.ConditionSynced); synced != nil {
+	if synced := meta.FindStatusCondition(h.getCluster("orders").Status.Conditions, cloudv1.ConditionSynced); synced != nil {
 		t.Errorf("Synced = %+v on a cluster that is gone, want it removed", synced)
 	}
 }
@@ -879,7 +879,7 @@ func TestProvisionSendsADerivedSubdomain(t *testing.T) {
 // TestProvisionRefusesAnUnusableDerivedSubdomain proves the failure is a
 // readable condition rather than a 400 from the control plane.
 func TestProvisionRefusesAnUnusableDerivedSubdomain(t *testing.T) {
-	cluster := provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
+	cluster := provisionCluster("orders", func(c *cloudv1.CloudCluster) {
 		c.Spec.DisplayName = "orders-production-eu"
 	})
 	h := newHarness(t, credentialSecret(), readyAccount(), cluster)
@@ -891,8 +891,8 @@ func TestProvisionRefusesAnUnusableDerivedSubdomain(t *testing.T) {
 	if h.cloud.CallCount("CreateCluster") != 0 {
 		t.Error("a subdomain the cloud would reject must not reach the create call")
 	}
-	cond := meta.FindStatusCondition(settled.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonInvalidSpec {
+	cond := meta.FindStatusCondition(settled.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonInvalidSpec {
 		t.Fatalf("Ready condition = %+v, want reason InvalidSpec", cond)
 	}
 	if !contains(cond.Message, "spec.subdomain") {
@@ -916,8 +916,8 @@ func TestRejectedCreateStopsRetrying(t *testing.T) {
 	}
 
 	cluster := h.getCluster("rejected")
-	cond := meta.FindStatusCondition(cluster.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonRefused {
+	cond := meta.FindStatusCondition(cluster.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonRefused {
 		t.Fatalf("Ready condition = %+v, want reason Refused", cond)
 	}
 	// Both halves of the policy: no timer, and an edit is the way on. Every
@@ -931,7 +931,7 @@ func TestRejectedCreateStopsRetrying(t *testing.T) {
 
 	// The refusal has to reach kubectl describe, not just the condition, since
 	// nothing else is going to happen until a human reads it.
-	if !h.hasEvent(v1alpha1.ReasonRefused) {
+	if !h.hasEvent(cloudv1.ReasonRefused) {
 		t.Error("expected a Warning event carrying the refusal")
 	}
 
@@ -956,8 +956,8 @@ func TestServerErrorOnCreateIsStillRetried(t *testing.T) {
 	}
 
 	cluster := h.getCluster("rejected")
-	cond := meta.FindStatusCondition(cluster.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonCloudUnreachable {
+	cond := meta.FindStatusCondition(cluster.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonCloudUnreachable {
 		t.Fatalf("Ready condition = %+v, want reason CloudUnreachable, not a terminal Refused", cond)
 	}
 }
@@ -981,8 +981,8 @@ func TestQuotaRefusalKeepsRetryingSlowly(t *testing.T) {
 	}
 
 	cluster := h.getCluster("quota")
-	cond := meta.FindStatusCondition(cluster.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonQuotaReached {
+	cond := meta.FindStatusCondition(cluster.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonQuotaReached {
 		t.Fatalf("Ready condition = %+v, want reason QuotaReached", cond)
 	}
 	if !contains(cond.Message, "Terminate a cluster") {
@@ -1012,8 +1012,8 @@ func TestAClusterBeingTerminatedIsNotTakenOver(t *testing.T) {
 	if settled.Status.ProductID != "" {
 		t.Errorf("bound to %q, a cluster being terminated", settled.Status.ProductID)
 	}
-	cond := meta.FindStatusCondition(settled.Status.Conditions, v1alpha1.ConditionReady)
-	if cond == nil || cond.Reason != v1alpha1.ReasonNameTaken || !contains(cond.Message, "being terminated") {
+	cond := meta.FindStatusCondition(settled.Status.Conditions, cloudv1.ConditionReady)
+	if cond == nil || cond.Reason != cloudv1.ReasonNameTaken || !contains(cond.Message, "being terminated") {
 		t.Errorf("Ready = %+v, want NameTaken saying the cluster is being terminated", cond)
 	}
 }
@@ -1038,9 +1038,9 @@ func TestANameMatchesWhateverItsCase(t *testing.T) {
 // nothing to retain, so it must neither announce "leaving RavenDB Cloud
 // cluster 17-A running" about a cluster that is gone nor send a terminate.
 func TestDeletingAClusterAlreadyGoneTouchesNothing(t *testing.T) {
-	for _, policy := range []v1alpha1.DeletionPolicy{v1alpha1.DeletionRetain, v1alpha1.DeletionTerminate} {
+	for _, policy := range []cloudv1.DeletionPolicy{cloudv1.DeletionRetain, cloudv1.DeletionTerminate} {
 		t.Run(string(policy), func(t *testing.T) {
-			h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
+			h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *cloudv1.CloudCluster) {
 				c.Spec.DeletionPolicy = policy
 			}))
 			h.reconcileClusterUntilSettled("orders", 6)
@@ -1059,7 +1059,7 @@ func TestDeletingAClusterAlreadyGoneTouchesNothing(t *testing.T) {
 			if events := h.events(); len(events) != 0 {
 				t.Errorf("events %q about a cluster that is already gone", events)
 			}
-			var left v1alpha1.CloudClusterList
+			var left cloudv1.CloudClusterList
 			if err := h.k8s.List(context.Background(), &left); err != nil || len(left.Items) != 0 {
 				t.Errorf("the object is still there: %d left, %v", len(left.Items), err)
 			}

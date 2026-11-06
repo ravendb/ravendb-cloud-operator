@@ -62,7 +62,7 @@ Makefile uses it unless `GO_LOCAL=1`.
 
 ```bash
 ./hack/go.sh go test ./internal/controller -run TestName
-make generate manifests chart-sync   # after touching api/v1alpha1/
+make generate manifests chart-sync   # after touching api/v1/
 ```
 
 Scale verification to the change: the few tests that cover a small one, the
@@ -81,7 +81,7 @@ Write for a programmer who joined last week.
   function does two things, or a value never got a name. Comments are for what
   code cannot carry: an external constraint, why the obvious alternative is
   wrong, a deliberate deviation. Not for history; commit messages hold that.
-- **`api/v1alpha1/` is the exception.** Its comments become `kubectl explain`,
+- **`api/v1/` is the exception.** Its comments become `kubectl explain`,
   so they are user documentation and should be generous.
 - **Go naming:** no stutter, initialisms fully upper (`APIKey`, `ID`, `URL`),
   name length inversely proportional to scope.

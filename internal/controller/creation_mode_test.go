@@ -5,27 +5,27 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudsim"
 )
 
 func TestTakeOverOnlyNeverCreates(t *testing.T) {
-	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.CreationMode = v1alpha1.CreationTakeOverOnly
+	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *cloudv1.CloudCluster) {
+		c.Spec.CreationMode = cloudv1.CreationTakeOverOnly
 	}))
 	h.reconcileCluster("orders")
 
 	if n := h.cloud.CallCount("CreateCluster"); n != 0 {
 		t.Errorf("sent %d creates under TakeOverOnly", n)
 	}
-	if got := conditionReason(h.getCluster("orders").Status.Conditions, v1alpha1.ConditionReady); got != v1alpha1.ReasonClusterNotFound {
+	if got := conditionReason(h.getCluster("orders").Status.Conditions, cloudv1.ConditionReady); got != cloudv1.ReasonClusterNotFound {
 		t.Errorf("Ready = %q, want ClusterNotFound", got)
 	}
 }
 
 func TestCreateOnlyNeverTakesOver(t *testing.T) {
-	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.CreationMode = v1alpha1.CreationCreateOnly
+	h := newHarness(t, credentialSecret(), readyAccount(), provisionCluster("orders", func(c *cloudv1.CloudCluster) {
+		c.Spec.CreationMode = cloudv1.CreationCreateOnly
 	}))
 	h.seedCloudCluster(cloudsim.SeedSpec{DisplayName: "orders"})
 	h.reconcileCluster("orders")
@@ -34,7 +34,7 @@ func TestCreateOnlyNeverTakesOver(t *testing.T) {
 	if cluster.Status.ProductID != "" {
 		t.Errorf("bound %s under CreateOnly", cluster.Status.ProductID)
 	}
-	if got := conditionReason(cluster.Status.Conditions, v1alpha1.ConditionReady); got != v1alpha1.ReasonNameTaken {
+	if got := conditionReason(cluster.Status.Conditions, cloudv1.ConditionReady); got != cloudv1.ReasonNameTaken {
 		t.Errorf("Ready = %q, want NameTaken", got)
 	}
 }
@@ -45,9 +45,9 @@ func TestCreateOnlyNeverTakesOver(t *testing.T) {
 // leave the cluster running and billed. Admission is what keeps Terminate to
 // a cluster the manifest claims.
 func TestTerminateEndsAClusterTakenOver(t *testing.T) {
-	h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("orders", func(c *v1alpha1.CloudCluster) {
-		c.Spec.CreationMode = v1alpha1.CreationTakeOverOnly
-		c.Spec.DeletionPolicy = v1alpha1.DeletionTerminate
+	h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("orders", func(c *cloudv1.CloudCluster) {
+		c.Spec.CreationMode = cloudv1.CreationTakeOverOnly
+		c.Spec.DeletionPolicy = cloudv1.DeletionTerminate
 	}))
 	seeded := h.seedCloudCluster(cloudsim.SeedSpec{DisplayName: "orders"})
 	h.reconcileClusterUntilSettled("orders", 6)
@@ -66,12 +66,12 @@ func TestTerminateEndsAClusterTakenOver(t *testing.T) {
 
 // A takeover nobody asked for warns; one the manifest asked for is routine.
 func TestATakeoverWarnsUnlessTheManifestAskedForIt(t *testing.T) {
-	for mode, want := range map[v1alpha1.CreationMode]string{
-		v1alpha1.CreationTakeOverOrCreate: "Warning " + v1alpha1.EventAdopted,
-		v1alpha1.CreationTakeOverOnly:     "Normal " + v1alpha1.EventAdopted,
+	for mode, want := range map[cloudv1.CreationMode]string{
+		cloudv1.CreationTakeOverOrCreate: "Warning " + cloudv1.EventAdopted,
+		cloudv1.CreationTakeOverOnly:     "Normal " + cloudv1.EventAdopted,
 	} {
 		t.Run(string(mode), func(t *testing.T) {
-			h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("orders", func(c *v1alpha1.CloudCluster) {
+			h := newHarness(t, credentialSecret(), readyAccount(), takeOverCluster("orders", func(c *cloudv1.CloudCluster) {
 				c.Spec.CreationMode = mode
 			}))
 			h.seedCloudCluster(cloudsim.SeedSpec{DisplayName: "orders"})

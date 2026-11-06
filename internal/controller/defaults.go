@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 )
 
@@ -52,7 +52,7 @@ func sanitizeSubdomain(in string) string {
 // smallestForTier is the instance type to ask for when the manifest names none:
 // fewest vCPUs, then least RAM, then name. The cheapest shape the tier offers,
 // so nobody is billed for a default they did not pick.
-func smallestForTier(available []cloudapi.InstanceType, tier v1alpha1.Tier) (string, error) {
+func smallestForTier(available []cloudapi.InstanceType, tier cloudv1.Tier) (string, error) {
 	var candidates []cloudapi.InstanceType
 	for _, it := range available {
 		if it.Tier == cloudapi.Tier(tier) {

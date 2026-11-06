@@ -12,7 +12,7 @@ count. In this lab you change all three by editing one manifest, and then restar
 One manifest, applied again and again with different numbers:
 
 ```yaml
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: lab05-prod
@@ -116,7 +116,7 @@ and a field meaning "restart" would fire again on every pass. So it is an object
 runs once, the way a Job does:
 
 ```yaml
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudClusterRestart
 metadata:
   name: lab05-restart

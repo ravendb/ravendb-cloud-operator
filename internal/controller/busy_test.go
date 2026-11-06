@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 )
 
@@ -24,7 +24,7 @@ func TestASecondRestartOfABusyClusterWaitsAndThenRuns(t *testing.T) {
 
 	h.reconcileRestart("restart-orders-A")
 	h.reconcileRestart("restart-orders-B")
-	if got := restartStatus(h.getRestart("restart-orders-B")); got != v1alpha1.ReasonWaiting {
+	if got := restartStatus(h.getRestart("restart-orders-B")); got != cloudv1.ReasonWaiting {
 		t.Fatalf("the second restart is %s while the first runs, want Waiting", got)
 	}
 

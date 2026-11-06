@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 )
 
@@ -247,7 +247,7 @@ func readZipEntry(file *zip.File) ([]byte, error) {
 // it ended up holding.
 func (r *CloudClusterReconciler) publishConnectionSecret(
 	ctx context.Context,
-	cluster *v1alpha1.CloudCluster,
+	cluster *cloudv1.CloudCluster,
 	observed *cloudapi.Cluster,
 	cloud cloudapi.Client,
 ) (secretState, error) {
@@ -259,7 +259,7 @@ func (r *CloudClusterReconciler) publishConnectionSecret(
 
 	if !cluster.ConnectionSecretEnabled() {
 		cluster.Status.ConnectionSecretName = ""
-		return secretState{v1alpha1.ReasonRunning, fmt.Sprintf(
+		return secretState{cloudv1.ReasonRunning, fmt.Sprintf(
 			"The cluster is Active with %d node(s). spec.connectionSecret.enabled is false, so Secret %q holds none of "+
 				"this operator's keys.", observed.NodeCount(), cluster.ConnectionSecretName())}, nil
 	}
@@ -302,7 +302,7 @@ func (r *CloudClusterReconciler) publishConnectionSecret(
 // publishEndpoints applies the endpoint half of the Secret, and returns the
 // Secret as it was before, or nil when it did not exist.
 func (r *CloudClusterReconciler) publishEndpoints(
-	ctx context.Context, cluster *v1alpha1.CloudCluster, observed *cloudapi.Cluster, name string,
+	ctx context.Context, cluster *cloudv1.CloudCluster, observed *cloudapi.Cluster, name string,
 ) (*corev1.Secret, error) {
 	if len(observed.URLs) == 0 {
 		// The Secret keeps what it holds: addresses from the last good read beat
@@ -334,7 +334,7 @@ func (r *CloudClusterReconciler) publishEndpoints(
 // writeCertificate applies what certificateFor decided: nothing, the removal of
 // every certificate key, or new ones.
 func (r *CloudClusterReconciler) writeCertificate(
-	ctx context.Context, cluster *v1alpha1.CloudCluster, name string, existing *corev1.Secret, certificate map[string][]byte,
+	ctx context.Context, cluster *cloudv1.CloudCluster, name string, existing *corev1.Secret, certificate map[string][]byte,
 ) error {
 	switch {
 	case certificate == nil:
@@ -351,16 +351,16 @@ func (r *CloudClusterReconciler) writeCertificate(
 
 // secretPublished records a change to what the connection Secret holds, as an
 // event and the matching log line.
-func (r *CloudClusterReconciler) secretPublished(ctx context.Context, cluster *v1alpha1.CloudCluster, format string, args ...any) {
+func (r *CloudClusterReconciler) secretPublished(ctx context.Context, cluster *cloudv1.CloudCluster, format string, args ...any) {
 	message := fmt.Sprintf(format, args...)
-	emit(r.Recorder, cluster, corev1.EventTypeNormal, v1alpha1.EventSecretPublished, "%s", message)
+	emit(r.Recorder, cluster, corev1.EventTypeNormal, cloudv1.EventSecretPublished, "%s", message)
 	log.FromContext(ctx).Info(message)
 }
 
 // existingConnectionSecret returns the named Secret in the cluster's namespace,
 // or nil when it does not exist.
 func (r *CloudClusterReconciler) existingConnectionSecret(
-	ctx context.Context, cluster *v1alpha1.CloudCluster, name string,
+	ctx context.Context, cluster *cloudv1.CloudCluster, name string,
 ) (*corev1.Secret, error) {
 	var secret corev1.Secret
 	ref := types.NamespacedName{Namespace: cluster.Namespace, Name: name}
@@ -377,7 +377,7 @@ func (r *CloudClusterReconciler) existingConnectionSecret(
 // means "apply nothing", which leaves what is stored untouched and is the
 // common case. An empty map means "apply no keys", which prunes them.
 func certificateFor(
-	cluster *v1alpha1.CloudCluster,
+	cluster *cloudv1.CloudCluster,
 	existing *corev1.Secret,
 	cert *cloudapi.ClientCertificate,
 ) (map[string][]byte, error) {
@@ -427,7 +427,7 @@ func carryForward(data, stored map[string][]byte) {
 // reference has it garbage collected. The name is a parameter because, after a
 // rename, unpublishing names a Secret the spec no longer does.
 func (r *CloudClusterReconciler) applyEndpoints(
-	ctx context.Context, cluster *v1alpha1.CloudCluster, name string, data map[string][]byte,
+	ctx context.Context, cluster *cloudv1.CloudCluster, name string, data map[string][]byte,
 ) error {
 	owner, err := controllerReference(cluster, r.Scheme)
 	if err != nil {
@@ -446,7 +446,7 @@ func (r *CloudClusterReconciler) applyEndpoints(
 // emptied. Otherwise a private key stays in a Secret the operator never writes
 // again. Only status can say which Secret that is: the spec no longer names it.
 func (r *CloudClusterReconciler) retirePreviousSecret(
-	ctx context.Context, cluster *v1alpha1.CloudCluster,
+	ctx context.Context, cluster *cloudv1.CloudCluster,
 ) (string, error) {
 	published := cluster.Status.ConnectionSecretName
 	if published == "" {
@@ -462,7 +462,7 @@ func (r *CloudClusterReconciler) retirePreviousSecret(
 // Secret object stays: the operator has no delete on Secrets, and the owner
 // reference collects it when the CloudCluster goes.
 func (r *CloudClusterReconciler) unpublishConnectionSecret(
-	ctx context.Context, cluster *v1alpha1.CloudCluster, name string,
+	ctx context.Context, cluster *cloudv1.CloudCluster, name string,
 ) error {
 	existing, err := r.existingConnectionSecret(ctx, cluster, name)
 	if err != nil {
@@ -481,7 +481,7 @@ func (r *CloudClusterReconciler) unpublishConnectionSecret(
 // removes only what its own manager owns, and keys written before the operator
 // used apply belong to a manager that no longer writes.
 func (r *CloudClusterReconciler) pruneCertificate(
-	ctx context.Context, cluster *v1alpha1.CloudCluster, name string, existing *corev1.Secret,
+	ctx context.Context, cluster *cloudv1.CloudCluster, name string, existing *corev1.Secret,
 ) error {
 	if err := r.applyCertificate(ctx, cluster, name, storedCertificate(existing)); err != nil {
 		return err
@@ -492,7 +492,7 @@ func (r *CloudClusterReconciler) pruneCertificate(
 // applyCertificate writes the certificate keys and only those, so the keys it
 // stops sending are the only ones pruned.
 func (r *CloudClusterReconciler) applyCertificate(
-	ctx context.Context, cluster *v1alpha1.CloudCluster, name string, data map[string][]byte,
+	ctx context.Context, cluster *cloudv1.CloudCluster, name string, data map[string][]byte,
 ) error {
 	return r.Apply(ctx, connectionSecretApply(cluster, name, data),
 		client.FieldOwner(fieldOwnerCertificate), client.ForceOwnership)
@@ -501,7 +501,7 @@ func (r *CloudClusterReconciler) applyCertificate(
 // connectionSecretApply is the part of a write both managers share. Apply owns
 // exactly the fields set here.
 func connectionSecretApply(
-	cluster *v1alpha1.CloudCluster, name string, data map[string][]byte,
+	cluster *cloudv1.CloudCluster, name string, data map[string][]byte,
 ) *corev1ac.SecretApplyConfiguration {
 	return corev1ac.Secret(name, cluster.Namespace).WithData(data)
 }
@@ -511,7 +511,7 @@ func connectionSecretApply(
 // controlling owner because publishEndpoints makes a stricter one first.
 // BlockOwnerDeletion is why the cloudclusters/finalizers grant exists.
 func controllerReference(
-	owner *v1alpha1.CloudCluster, scheme *runtime.Scheme,
+	owner *cloudv1.CloudCluster, scheme *runtime.Scheme,
 ) (*metav1ac.OwnerReferenceApplyConfiguration, error) {
 	gvk, err := apiutil.GVKForObject(owner, scheme)
 	if err != nil {
@@ -534,7 +534,7 @@ func controllerReference(
 // yet, which is not a failure.
 func (r *CloudClusterReconciler) downloadCertificate(
 	ctx context.Context,
-	cluster *v1alpha1.CloudCluster,
+	cluster *cloudv1.CloudCluster,
 	existing *corev1.Secret,
 	observed *cloudapi.Cluster,
 	cloud cloudapi.Client,
@@ -560,7 +560,7 @@ func (r *CloudClusterReconciler) downloadCertificate(
 // what the Secret holds, not on extractErr alone: a pass that downloaded
 // nothing must not report success for having attempted nothing.
 func describeSecret(
-	cluster *v1alpha1.CloudCluster,
+	cluster *cloudv1.CloudCluster,
 	observed *cloudapi.Cluster,
 	name string,
 	storedCert []byte,
@@ -568,26 +568,26 @@ func describeSecret(
 	certPending bool,
 ) secretState {
 	if extractErr != nil {
-		return secretState{v1alpha1.ReasonUnexpectedResponse, sentence(fmt.Sprintf(
+		return secretState{cloudv1.ReasonUnexpectedResponse, sentence(fmt.Sprintf(
 			"The cluster is Active and Secret %q holds its URLs and the raw certificate bundle, but the bundle "+
 				"could not be unpacked: %v", name, extractErr)) + " This usually means the RavenDB Cloud API changed " +
 			"and this operator needs upgrading."}
 	}
 	if !cluster.ConnectionSecretIncludesCertificate() {
-		return secretState{v1alpha1.ReasonRunning, fmt.Sprintf(
+		return secretState{cloudv1.ReasonRunning, fmt.Sprintf(
 			"The cluster is Active with %d node(s), and Secret %q holds its URLs. includeCertificate is false, so "+
 				"the client certificate is not in it.", observed.NodeCount(), name)}
 	}
 	if len(storedCert) == 0 && certPending {
-		return secretState{v1alpha1.ReasonWaitingForCertificate, fmt.Sprintf(
+		return secretState{cloudv1.ReasonWaitingForCertificate, fmt.Sprintf(
 			"The cluster is Active and Secret %q holds its URLs. RavenDB Cloud has not issued the client "+
 				"certificate yet; it is added on a later poll.", name)}
 	}
 	if len(storedCert) == 0 {
-		return secretState{v1alpha1.ReasonUnexpectedResponse, fmt.Sprintf(
+		return secretState{cloudv1.ReasonUnexpectedResponse, fmt.Sprintf(
 			"The cluster is Active and Secret %q holds its URLs, but no %s.", name, secretKeyTLSCert)}
 	}
-	return secretState{v1alpha1.ReasonRunning, fmt.Sprintf(
+	return secretState{cloudv1.ReasonRunning, fmt.Sprintf(
 		"The cluster is Active with %d node(s), and Secret %q holds its URLs and client certificate.",
 		observed.NodeCount(), name)}
 }

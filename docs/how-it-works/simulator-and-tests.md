@@ -14,7 +14,7 @@ adding a test, changing `internal/cloudsim`, or adding a lab.
 
 An in-process HTTP server counts as unit: `httptest` needs no binary and no
 network. Go tiers by package, not file, so a package mixing pure tests with an
-`httptest` harness stays one tier. `api/v1alpha1` reports `ok` without envtest
+`httptest` harness stays one tier. `api/v1` reports `ok` without envtest
 having run anything; `make test-unit` warns about that.
 
 ## The simulator is a second reading

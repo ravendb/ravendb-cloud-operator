@@ -92,7 +92,7 @@ step "And that it still reconciles from in there"
 # which is a check that cannot fail rather than a check that passed.
 CHECK_ACCOUNT=chart-check-account
 kubectl -n "$LAB_NAMESPACE" apply -f - >/dev/null <<YAML
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata:
   name: $CHECK_ACCOUNT

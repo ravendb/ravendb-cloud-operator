@@ -61,7 +61,7 @@ WAIT="$LAB_CHANGE_TIMEOUT"
 apply_cluster() {
   local instance="$1" nodes="$2" size="$3"
   cat <<EOF | k apply -f - | sed 's/^/    /'
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $CLUSTER
@@ -387,7 +387,7 @@ info "$SMALL sells {$SMALL_MENU} GB; this manifest asks for $OFFMENU"
 on_mock && lab_api POST /_lab/requests/reset >/dev/null
 SYNC_BEFORE="$(jp cloudcluster "$CLUSTER" .status.lastSyncTime)"
 cat <<EOF | k apply -f - | sed 's/^/    /'
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: $BAD
@@ -460,7 +460,7 @@ k patch cloudcluster "$CLUSTER" --type=merge -p '{"spec":{"managementPolicy":"Ob
 wait_for cloudcluster "$CLUSTER" .status.managementPolicy Observe 60 >/dev/null || true
 
 cat <<YAML | k apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudClusterRestart
 metadata:
   name: lab05-restart
@@ -525,7 +525,7 @@ step "A node the cluster does not have is refused without a call"
 # decidable from the object, so the operator checks it against status.nodeTags
 # and fails the restart rather than spending a call to be told no.
 cat <<YAML | k apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudClusterRestart
 metadata:
   name: lab05-restart-nowhere
@@ -550,7 +550,7 @@ check_calls "restart calls, still only the one above" 1 "$(count_calls /api/v1/p
 # One upper case letter is the shape, and that much the API server enforces, so
 # a lower case tag never reaches the operator at all.
 SHAPE="$(cat <<YAML | k apply -f - 2>&1 || true
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudClusterRestart
 metadata:
   name: lab05-restart-badshape

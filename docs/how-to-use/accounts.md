@@ -13,7 +13,7 @@ metadata: {name: ravendb-cloud-api-key, namespace: apps}
 stringData:
   apiKey: "<a key from the RavenDB Cloud portal>"
 ---
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata: {name: ravendb-cloud, namespace: apps}
 spec:

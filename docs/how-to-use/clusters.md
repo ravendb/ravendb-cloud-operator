@@ -8,7 +8,7 @@ object name: if the account has a cluster by that name, the object takes it
 over; if not, the operator creates one.
 
 ```yaml
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata: {name: orders-prod, namespace: apps}
 spec:

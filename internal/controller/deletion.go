@@ -10,14 +10,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/ravendb/ravendb-cloud-operator/api/v1alpha1"
+	cloudv1 "github.com/ravendb/ravendb-cloud-operator/api/v1"
 	"github.com/ravendb/ravendb-cloud-operator/internal/cloudapi"
 )
 
 // reconcileDelete honours the deletion policy and then releases the finalizer.
 func (r *CloudClusterReconciler) reconcileDelete(
 	ctx context.Context,
-	original, cluster *v1alpha1.CloudCluster,
+	original, cluster *cloudv1.CloudCluster,
 	cloud cloudapi.Client,
 ) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(cluster, clusterFinalizer) {
@@ -30,7 +30,7 @@ func (r *CloudClusterReconciler) reconcileDelete(
 			log.FromContext(ctx).Info("the RavenDB Cloud cluster was already deleted outside this operator",
 				"productID", cluster.Status.ProductID)
 		case cluster.Status.ProductID != "":
-			emit(r.Recorder, cluster, corev1.EventTypeNormal, v1alpha1.EventRetained,
+			emit(r.Recorder, cluster, corev1.EventTypeNormal, cloudv1.EventRetained,
 				"deletionPolicy is Retain: leaving RavenDB Cloud cluster %s running.", cluster.Status.ProductID)
 			log.FromContext(ctx).Info("leaving the RavenDB Cloud cluster running", "productID", cluster.Status.ProductID)
 		}
@@ -46,7 +46,7 @@ func (r *CloudClusterReconciler) reconcileDelete(
 		productID = found
 	}
 
-	emit(r.Recorder, cluster, corev1.EventTypeNormal, v1alpha1.EventTerminating,
+	emit(r.Recorder, cluster, corev1.EventTypeNormal, cloudv1.EventTerminating,
 		"deletionPolicy is Terminate: terminating RavenDB Cloud cluster %s.", productID)
 	log.FromContext(ctx).Info("terminating a RavenDB Cloud cluster", "productID", productID)
 
@@ -62,7 +62,7 @@ func (r *CloudClusterReconciler) reconcileDelete(
 //
 // An empty id means the pass is over, and the result says how it ended.
 func (r *CloudClusterReconciler) findInterruptedCreate(
-	ctx context.Context, original, cluster *v1alpha1.CloudCluster, cloud cloudapi.Client,
+	ctx context.Context, original, cluster *cloudv1.CloudCluster, cloud cloudapi.Client,
 ) (string, ctrl.Result, error) {
 	name := lookupName(cluster)
 	ref, err := cloud.FindClusterByName(ctx, name)
@@ -104,7 +104,7 @@ func (r *CloudClusterReconciler) findInterruptedCreate(
 // this object created: another CloudCluster holds it, or its tier, provider or
 // region is not what this object asks for.
 func (r *CloudClusterReconciler) belongsElsewhere(
-	ctx context.Context, cluster *v1alpha1.CloudCluster, cloud cloudapi.Client, ref *cloudapi.ClusterRef,
+	ctx context.Context, cluster *cloudv1.CloudCluster, cloud cloudapi.Client, ref *cloudapi.ClusterRef,
 ) (bool, error) {
 	holder, err := r.holderOf(ctx, cluster, ref.ID)
 	if err != nil || holder != "" {
@@ -121,7 +121,7 @@ func (r *CloudClusterReconciler) belongsElsewhere(
 // It releases on the same predicate reconcileDelete does, so a broken account
 // never makes deletion stricter than a healthy one.
 func (r *CloudClusterReconciler) deleteWithoutAccount(
-	ctx context.Context, original, cluster *v1alpha1.CloudCluster, result ctrl.Result, err error,
+	ctx context.Context, original, cluster *cloudv1.CloudCluster, result ctrl.Result, err error,
 ) (ctrl.Result, error) {
 	if nothingToTerminate(cluster) {
 		return r.releaseFinalizer(ctx, cluster)
@@ -135,7 +135,7 @@ func (r *CloudClusterReconciler) deleteWithoutAccount(
 // Secret wakes the account and not this object. Any other refusal RavenDB
 // Cloud would repeat, so it waits for the object to change.
 func (r *CloudClusterReconciler) terminateFailed(
-	ctx context.Context, original, cluster *v1alpha1.CloudCluster, doing string, err error,
+	ctx context.Context, original, cluster *cloudv1.CloudCluster, doing string, err error,
 ) (ctrl.Result, error) {
 	message := sentence(fmt.Sprintf("Could not %s: %s", doing, cloudSaid(err))) +
 		" The object stays until this succeeds."
@@ -158,11 +158,11 @@ func (r *CloudClusterReconciler) terminateFailed(
 // deletionStuck says what a deletion is waiting for, and warns once per thing
 // it is stuck on: Deleting itself does not warn, because most deletions finish
 // at once.
-func (r *CloudClusterReconciler) deletionStuck(ctx context.Context, cluster *v1alpha1.CloudCluster, message string) {
-	if !saysAlready(cluster.Status.Conditions, v1alpha1.ConditionReady, v1alpha1.ReasonDeleting, message) {
-		emit(r.Recorder, cluster, corev1.EventTypeWarning, v1alpha1.ReasonDeleting, "%s", message)
+func (r *CloudClusterReconciler) deletionStuck(ctx context.Context, cluster *cloudv1.CloudCluster, message string) {
+	if !saysAlready(cluster.Status.Conditions, cloudv1.ConditionReady, cloudv1.ReasonDeleting, message) {
+		emit(r.Recorder, cluster, corev1.EventTypeWarning, cloudv1.ReasonDeleting, "%s", message)
 	}
-	r.ready(ctx, cluster, v1alpha1.ReasonDeleting, message)
+	r.ready(ctx, cluster, cloudv1.ReasonDeleting, message)
 }
 
 // nothingToTerminate reports whether deleting this object provably leaves
@@ -174,8 +174,8 @@ func (r *CloudClusterReconciler) deletionStuck(ctx context.Context, cluster *v1a
 // difference. That is recorded only in status, which a restore from git or a
 // backup does not bring back, and a Terminate that worked only until then
 // would leave the cluster running and billed with nothing left to name it.
-func nothingToTerminate(cluster *v1alpha1.CloudCluster) bool {
-	if cluster.EffectiveDeletionPolicy() == v1alpha1.DeletionRetain || goneFromCloud(cluster) {
+func nothingToTerminate(cluster *cloudv1.CloudCluster) bool {
+	if cluster.EffectiveDeletionPolicy() == cloudv1.DeletionRetain || goneFromCloud(cluster) {
 		return true
 	}
 	return cluster.Status.ProductID == "" && cluster.Status.ProvisionAttemptedAt == nil
@@ -184,18 +184,18 @@ func nothingToTerminate(cluster *v1alpha1.CloudCluster) bool {
 // goneFromCloud reports whether the cluster was already deleted in RavenDB Cloud
 // when this object last looked. cloudStatus outlives a Ready overwritten by
 // Deleting; a 404 records no cloudStatus and leaves only Ready.
-func goneFromCloud(cluster *v1alpha1.CloudCluster) bool {
+func goneFromCloud(cluster *cloudv1.CloudCluster) bool {
 	switch cloudapi.ClusterStatus(cluster.Status.CloudStatus) {
 	case cloudapi.StatusTerminating, cloudapi.StatusTerminated:
 		return true
 	}
-	return v1alpha1.ConditionReason(cluster.Status.Conditions, v1alpha1.ConditionReady) == v1alpha1.ReasonDeletedInCloud
+	return cloudv1.ConditionReason(cluster.Status.Conditions, cloudv1.ConditionReady) == cloudv1.ReasonDeletedInCloud
 }
 
 // deletionBlockedMessage explains why deletion cannot finish while the
 // CloudAccount is unusable. It is rebuilt from status rather than appended to
 // the condition, so polling does not stack the same sentence up.
-func deletionBlockedMessage(cluster *v1alpha1.CloudCluster) string {
+func deletionBlockedMessage(cluster *cloudv1.CloudCluster) string {
 	if cluster.Status.ProductID != "" {
 		return fmt.Sprintf(
 			"deletionPolicy is Terminate, so RavenDB Cloud cluster %s cannot be terminated until CloudAccount %q and the "+
@@ -210,7 +210,7 @@ func deletionBlockedMessage(cluster *v1alpha1.CloudCluster) string {
 		cluster.Spec.AccountRef.Name)
 }
 
-func (r *CloudClusterReconciler) releaseFinalizer(ctx context.Context, cluster *v1alpha1.CloudCluster) (ctrl.Result, error) {
+func (r *CloudClusterReconciler) releaseFinalizer(ctx context.Context, cluster *cloudv1.CloudCluster) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(cluster, clusterFinalizer) {
 		return ctrl.Result{}, nil
 	}
@@ -228,7 +228,7 @@ func (r *CloudClusterReconciler) releaseFinalizer(ctx context.Context, cluster *
 // the spec the user applied (an omitempty struct serialises as {}), so an
 // Update bumps generation and the object stops matching anyone's git
 // repository.
-func (r *CloudClusterReconciler) addFinalizer(ctx context.Context, cluster *v1alpha1.CloudCluster) error {
+func (r *CloudClusterReconciler) addFinalizer(ctx context.Context, cluster *cloudv1.CloudCluster) error {
 	if controllerutil.ContainsFinalizer(cluster, clusterFinalizer) {
 		return nil
 	}

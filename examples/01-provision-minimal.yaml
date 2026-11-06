@@ -22,7 +22,7 @@
 # the object says so and setting spec.subdomain fixes it. Once the cluster
 # exists, displayName and subdomain are fixed for good, as are tier, provider
 # and region.
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: orders-dev

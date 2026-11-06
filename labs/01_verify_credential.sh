@@ -89,7 +89,7 @@ CALLS_INFO_BEFORE="$(count_calls /api/v1/account/info)"
 CALLS_META_BEFORE="$(count_calls /api/v1/metadata/)"
 
 cat <<YAML | k apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata:
   name: lab01-account
@@ -242,7 +242,7 @@ check "the default region exists for the default provider" yes \
 step "Failure 1: the Secret has not been created yet"
 note "applying a CloudAccount whose Secret is missing, then creating the Secret"
 cat <<YAML | k apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata:
   name: lab01-late
@@ -290,7 +290,7 @@ note "the key rotation further down settles it properly, against a 300s requeue.
 
 step "Failure 2: the Secret exists but the key inside it does not"
 cat <<YAML | k apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata:
   name: lab01-wrong-key
@@ -386,7 +386,7 @@ note "are tracked separately and run on different clocks"
 
 step "A cluster on a broken account reports the account, not a cloud error"
 cat <<YAML | k apply -f - >/dev/null
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudAccount
 metadata:
   name: lab01-broken
@@ -394,7 +394,7 @@ spec:
   apiKeySecretRef:
     name: lab01-broken-key
 ---
-apiVersion: cloud.ravendb.net/v1alpha1
+apiVersion: cloud.ravendb.net/v1
 kind: CloudCluster
 metadata:
   name: lab01-orphan
