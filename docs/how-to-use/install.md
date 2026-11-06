@@ -37,6 +37,17 @@ kubectl apply --server-side -f https://github.com/ravendb/ravendb-cloud-operator
 It installs into `ravendb-cloud-operator-system` with cluster-wide permissions; the Helm chart
 is the way to keep the operator to one namespace.
 
+## Checking what you install
+
+Every release signs what it publishes: the image, `install.yaml` and the kubectl plugin carry a
+provenance attestation tying them to the commit and the workflow run that built them. Check one
+with the GitHub CLI before installing:
+
+```bash
+gh attestation verify oci://docker.io/ravendb/ravendb-cloud-operator:<version> --repo ravendb/ravendb-cloud-operator
+gh attestation verify install.yaml --repo ravendb/ravendb-cloud-operator
+```
+
 ## From a checkout
 
 ```bash
