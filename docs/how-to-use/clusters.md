@@ -28,6 +28,10 @@ CloudAccount, or the smallest the tier offers), and status reports what it got.
 On a cluster that already exists, a field left out is left as the cluster has
 it.
 
+The display name is the only thing that tells clusters apart, so give each
+environment its own, such as `orders-preview` and `orders-prod`. A preview
+manifest that says `orders-prod` finds production.
+
 ## What the operator may change: `managementPolicy`
 
 - **`Full`**: the operator creates the cluster when none exists, and applies

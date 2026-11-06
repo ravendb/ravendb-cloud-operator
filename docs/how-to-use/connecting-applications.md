@@ -119,6 +119,16 @@ runs out. Most applications read the certificate once, when they open the
 store, so restart them to pick it up. A tool that rolls workloads when a Secret
 changes, such as Reloader, does that for you.
 
+A certificate regenerated in the portal, because the old one may have leaked,
+is a different case. RavenDB Cloud keeps the old one valid, and the Secret keeps
+it too until three weeks before its own expiry. To cut it off:
+
+1. Delete the old certificate in the RavenDB Studio (Manage Server,
+   Certificates).
+2. Delete the connection Secret. The operator notices and writes it again,
+   with the new certificate.
+3. Restart the applications that read it.
+
 ## Turning it off
 
 `spec.connectionSecret.enabled: false` removes every key the operator wrote and

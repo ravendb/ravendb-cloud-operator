@@ -15,6 +15,11 @@ the cluster in RavenDB Cloud is decided by `spec.deletionPolicy`:
   `TakeOverOnly`, so a cluster that only shares the name is never terminated.
   Terminating cannot be undone.
 
+> **Deleting a namespace deletes its CloudClusters.** Every one with
+> `deletionPolicy: Terminate` terminates its cluster, the same as
+> `kubectl delete cloudcluster`, and so does a GitOps tool that prunes the
+> namespace. Keep `Terminate` to namespaces whose clusters may go with them.
+
 A terminated cluster takes a few minutes to wind down. When it has, RavenDB
 Cloud hides it in the portal, which frees its name: RavenDB Cloud keeps a
 terminated cluster's record, and the name stays taken until that record is

@@ -26,6 +26,16 @@ worth knowing:
 Run one replica. If you run two, only one acts at a time and the other stands
 by.
 
+Where one namespace holds the accounts and clusters, set `watchNamespace`: the
+operator then reads and writes Secrets in that namespace only, instead of
+everywhere ([SECURITY.md](../../SECURITY.md#permissions) says why that
+matters). Label the release namespace for the `restricted` Pod Security
+Standard, which the operator meets:
+
+```bash
+kubectl label namespace ravendb-cloud-operator-system pod-security.kubernetes.io/enforce=restricted
+```
+
 ## Without Helm
 
 Every release carries `install.yaml`: the CRDs, the RBAC and the operator in one file.
