@@ -115,6 +115,11 @@ Two workflows, as in [ravendb-operator](https://github.com/ravendb/ravendb-opera
    plugin. Remove the label to merge without publishing. A release candidate
    does not move `latest`.
 
+Each workflow runs the tests and code generation in a job with read access
+only, and hands what it built to a second job that holds the credentials and
+runs no code from the repository before it publishes. Keep new build or test
+steps in the first job.
+
 Set up once, by a repository admin:
 
 - secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (a token that can push
