@@ -42,7 +42,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
 
       - name: the version is well formed and new
         run: |
@@ -121,7 +121,7 @@ jobs:
 
       - name: open the release pull request
         id: pr
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
         with:
           token: ${{ secrets.RAVENDB_BOT_PAT }}
           branch: release/v${{ env.VERSION }}
