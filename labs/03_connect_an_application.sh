@@ -436,6 +436,12 @@ if ! wait_exists secret "$SECRET" 90; then
   operator_logs 30
 fi
 check "the Secret is back"    yes "$(exists secret "$SECRET")"
+# The operator writes the URLs first and the certificate once it has downloaded
+# it, a moment later, so the keys are checked once both writes are in.
+for _ in $(seq 1 30); do
+  [ "$(secret_key_line "$SECRET")" = "$EXPECTED_KEYS" ] && break
+  sleep 2
+done
 check "and has all its keys"  "$EXPECTED_KEYS" "$(secret_key_line "$SECRET")"
 check_calls "certificate downloads" "$((CERTS_BEFORE_DELETE + 1))" "$(certificate_calls)"
 
