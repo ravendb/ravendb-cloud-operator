@@ -1,6 +1,6 @@
 # Build the manager binary, and the kubectl plugin beside it. Both base images
 # are pinned by digest, which a tag cannot promise, and Dependabot moves them.
-FROM golang:1.26@sha256:cfa27959837144bf4649802ba38e59daffd0dd2a7994aa83daaf113285b0f551 AS builder
+FROM golang:1.26@sha256:4165ee6bf3b7811fd7b40373290405c83d0167dcb87ee5f29c427cdcef45ff8f AS builder
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 ARG VERSION=dev
