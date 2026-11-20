@@ -1,6 +1,6 @@
 {
   "name": "ravendb-cloud-operator",
-  "version": "0.0.0-dev",
+  "version": "1.0.0",
   "description": "A skill for writing and troubleshooting RavenDB Cloud operator manifests.",
   "license": "MIT"
 }

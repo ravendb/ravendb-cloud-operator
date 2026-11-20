@@ -6,7 +6,7 @@
 # The version of the last release, or of the one being prepared: the Prepare
 # Release workflow sets it, the Release workflow reads it, and it is stamped
 # into both binaries.
-VERSION ?= 0.0.0-dev
+VERSION ?= 1.0.0
 
 # A local build, because docker-build and deploy are the development path. The
 # published image is pinned by the Helm chart to the release it ships with, and
