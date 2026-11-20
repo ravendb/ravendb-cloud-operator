@@ -4,8 +4,8 @@ Manage RavenDB Cloud clusters as Kubernetes objects. Create a cluster from a
 manifest, or take over one that already exists, and get its URLs and client
 certificate in a Secret your applications mount.
 
-> `v1`, not released yet. For RavenDB running on your own Kubernetes
-> nodes, see [ravendb-operator](https://github.com/ravendb/ravendb-operator).
+> For RavenDB running on your own Kubernetes nodes, see
+> [ravendb-operator](https://github.com/ravendb/ravendb-operator).
 
 ## What you write
 
@@ -78,8 +78,8 @@ helm install ravendb-cloud-operator ravendb-cloud-operator/ravendb-cloud-operato
   --version <version> --namespace ravendb-cloud-operator-system --create-namespace
 ```
 
-Until the first release, install from a checkout: [installing](docs/how-to-use/install.md).
-Then the key, the account and a cluster:
+Or apply `install.yaml` from a [release](https://github.com/ravendb/ravendb-cloud-operator/releases);
+[installing](docs/how-to-use/install.md) covers both. Then the key, the account and a cluster:
 
 ```bash
 kubectl create namespace apps
