@@ -1,0 +1,38 @@
+name: Docker Hub description
+
+# Publishes .github/dockerhub-overview.md as the description of the image on
+# Docker Hub, whenever it changes on main, or by hand. It runs no code from this
+# repository.
+#
+# Secrets:
+#   DOCKERHUB_USERNAME            the Docker ID the token belongs to
+#   DOCKERHUB_DESCRIPTION_TOKEN   a Docker Hub token with read/write/delete
+#                                 scope, which Docker Hub requires to edit a
+#                                 description. Kept apart from DOCKERHUB_TOKEN,
+#                                 so the release job never holds delete rights.
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/dockerhub-overview.md
+      - .github/workflows/dockerhub-description.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_DESCRIPTION_TOKEN }}
+          repository: ravendb/ravendb-cloud-operator
+          short-description: https://github.com/ravendb/ravendb-cloud-operator
+          readme-filepath: .github/dockerhub-overview.md

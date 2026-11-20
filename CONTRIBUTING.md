@@ -120,11 +120,17 @@ only, and hands what it built to a second job that holds the credentials and
 runs no code from the repository before it publishes. Keep new build or test
 steps in the first job.
 
+The image's description on Docker Hub is `.github/dockerhub-overview.md`.
+**Docker Hub description** publishes it whenever it changes on `main`, or when
+run by hand.
+
 Set up once, by a repository admin:
 
 - secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (a token that can push
   `ravendb/ravendb-cloud-operator`), and `RAVENDB_BOT_PAT`, which opens the
   release pull request so CI runs on it;
+- secret `DOCKERHUB_DESCRIPTION_TOKEN`, a Docker Hub token with read/write/delete
+  scope, which Docker Hub requires to edit the description;
 - GitHub Pages serving the `main` branch, which publishes `helm/` as the Helm
   repository `https://ravendb.github.io/ravendb-cloud-operator/helm`;
 - that Helm repository registered in Artifact Hub, which reads
